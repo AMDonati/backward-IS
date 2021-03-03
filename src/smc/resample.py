@@ -1,7 +1,8 @@
-import tensorflow as tf
+#import tensorflow as tf
 import numpy as np
+import torch
 
-def resample(params, i_t, t):
+def resample_smc_t(params, i_t, t):
     """
     :param params: attention parameters tensor to be reshaped (K or V) > shape (B,P,S,D)
     :param i_t: current set of indices at time t > shape (B,P)
@@ -27,6 +28,17 @@ def resample(params, i_t, t):
     new_params = tf.concat([new_params, future_params],
                            axis=2)  # concatenating new_params (until t-1) and old params (from t)
     return new_params
+
+def resample(params, I):
+    '''
+    :params: shape (B,P,H)
+    :I: shape (B,P)
+    '''
+    #I = torch.tile(I.unsqueeze(-1), reps=(1,1,params.size(-1))) # (B,P,H)
+    I = I.unsqueeze(-1).repeat(1,1,params.size(-1))
+    resampled_params = torch.gather(input=params, index=I, dim=1)
+    return resampled_params
+
 
 
 if __name__ == "__main__":

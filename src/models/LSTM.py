@@ -1,5 +1,5 @@
 '''
-Implementation of a LSTM with LayerNorm.
+Implementation of a LSTM.
 Inspired from: https://github.com/pytorch/pytorch/issues/11335
 '''
 
@@ -94,3 +94,5 @@ class LSTM(nn.Module):
         cy = torch.stack(ct[-1])
 
         return output, (hy, cy)
+
+
