@@ -29,7 +29,6 @@ def split_weather_dataset(file_path, fname, col_name, index_name, history, step,
         uni_data_df.to_csv(os.path.join(path, "raw_data.csv"))
         np.save(os.path.join(path, "raw_data.npy"), uni_data)
 
-
     # normalization
     data_mean = uni_data.mean(axis=0)
     data_std = uni_data.std(axis=0)

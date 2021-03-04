@@ -89,7 +89,8 @@ class OneLayerRNN(nn.Module):
             hx = hy
         hidden = torch.stack(ht, dim=1)
         logits = self.fc(hidden)
-        observations = self.rnn_cell.add_noise(logits, self.sigma_y)
+        observations = self.rnn_cell.add_noise(logits, self.sigma_y) # (B,S,P,F_y)
+        observations = observations.permute(0,2,1,3)
         return observations, (hidden, hy)
 
 
