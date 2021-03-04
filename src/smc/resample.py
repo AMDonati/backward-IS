@@ -2,39 +2,11 @@
 import numpy as np
 import torch
 
-def resample_smc_t(params, i_t, t):
-    """
-    :param params: attention parameters tensor to be reshaped (K or V) > shape (B,P,S,D)
-    :param i_t: current set of indices at time t > shape (B,P)
-    :param t: decoding timestep (int from 0 until seq_len-1)
-    :return:
-    the trajectories of the attention parameters resampling according to i_t.
-    """
-    # TODO use tf.scatter_nd instead to avoid the for loop on the number of particles?
-    num_particles = tf.shape(params)[1]
-    past_params = params[:, :, :t + 1, :]  # (B,P,t,D)
-    future_params = params[:, :, t + 1:, :]  # (B,P,S-t,D)
-    rows_new_params = []
-    for m in range(num_particles):
-        i_t_m = i_t[:, m]  # shape B
-        # reshaping to (B,1)
-        i_t_m = tf.expand_dims(i_t_m, axis=-1)
-        row_m_new_params = tf.gather(past_params, i_t_m, axis=1, batch_dims=1)  # shape (B,1,t-1,D)
-        # squeezing on 2nd dim:
-        row_m_new_params = tf.squeeze(row_m_new_params, axis=1)
-        rows_new_params.append(row_m_new_params)
-    # stacking the new rows in the a new tensor
-    new_params = tf.stack(rows_new_params, axis=1)  # add a tf.expand_dims? # (B,P,t-1,D)
-    new_params = tf.concat([new_params, future_params],
-                           axis=2)  # concatenating new_params (until t-1) and old params (from t)
-    return new_params
-
 def resample(params, I):
     '''
     :params: shape (B,P,H)
     :I: shape (B,P)
     '''
-    #I = torch.tile(I.unsqueeze(-1), reps=(1,1,params.size(-1))) # (B,P,H)
     I = I.unsqueeze(-1).repeat(1,1,params.size(-1))
     resampled_params = torch.gather(input=params, index=I, dim=1)
     return resampled_params
