@@ -17,7 +17,18 @@ def get_parser():
     parser.add_argument("-lr", type=float, default=0.001, help="learning rate")
     # output_path params.
     parser.add_argument("-output_path", type=str, required=True, help="path for output folder")
-    parser.add_argument("-save_path", type=str, help="path for saved model folder (if loading ckpt)")
+    parser.add_argument("-save_path", type=str, help="path for saved model folder (if load checkpoint)")
+    # generate arguments
+    parser.add_argument("-bs_test", type=int, help="batch size for generating observations")
+    parser.add_argument("-data_samples", type=int, default=3000, help="number of data samples in the test dataset to generate observations on.")
+    parser.add_argument("-num_samples", type=int, default=100,
+                        help="number of samples for each observation.")
+    parser.add_argument("-sigma_init", type=float, default=0.5,
+                        help="covariance matrix for initial hidden state")
+    parser.add_argument("-sigma_h", type=float, default=0.5,
+                        help="covariance matrix for the internal gaussian noise for the transition function.")
+    parser.add_argument("-sigma_y", type=float, default=0.5,
+                        help="covariance matrix for the internal gaussian noise for the observation model.")
 
     return parser
 
@@ -25,7 +36,7 @@ def run(args):
 
     # -------------------------------- Upload dataset ----------------------------------------------------------------------------------
     dataset = Dataset(data_path=args.data_path, name=args.dataset,
-                          max_samples=args.max_samples)
+                          max_samples=args.max_samples, max_size_test=args.data_samples)
 
     algo = RNNAlgo(dataset=dataset, args=args)
 
@@ -34,6 +45,7 @@ def run(args):
     else:
         print("skipping training...")
     algo.test()
+    algo.generate_observations(sigma_init=args.sigma_init, sigma_h=args.sigma_h, sigma_y=args.sigma_y, num_samples=args.num_samples)
 
 
 if __name__ == '__main__':

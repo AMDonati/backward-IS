@@ -31,7 +31,7 @@ class RNNBackwardISSmoothing:
 
     def init_particles(self):
         '''return (\xi_0^l, \omega_0^l, \tau_0^l)'''
-        self.ancestors = self.states[:,:,0,]
+        self.ancestors = self.states[:,:,0,:]
         preds = self.rnn.fc(self.ancestors) #TODO: put this inside the bootstrap filter instead.
         self.filtering_weights = self.bootstrap_filter.compute_filtering_weights(predictions=preds, targets=self.observations[:,:,0,:]) #decide if take $Y_0 of $Y_1$
         self.past_tau = torch.zeros(1, self.num_particles, self.states.size(-1))

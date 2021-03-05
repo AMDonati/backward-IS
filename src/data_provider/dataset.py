@@ -83,7 +83,8 @@ class Dataset:
         val_dataset = torch.utils.data.TensorDataset(X_val, y_val)
         dataloader_val = torch.utils.data.DataLoader(val_dataset, batch_size=args.bs, drop_last=True)
         test_dataset = torch.utils.data.TensorDataset(X_test, y_test)
-        dataloader_test = torch.utils.data.DataLoader(test_dataset, batch_size=args.bs, drop_last=True)
+        batch_size_test = args.bs if args.bs_test is None else args.bs_test
+        dataloader_test = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size_test, drop_last=True)
         self.seq_len = X_train.shape[-2]
         self.output_size = y_train.shape[-1]
         self.input_size = X_train.shape[-1]

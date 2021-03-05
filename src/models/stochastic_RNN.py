@@ -59,12 +59,28 @@ class OneLayerRNN(nn.Module):
         self.hidden_size = hidden_size
         self.rnn_cell = RNNCell(input_size, hidden_size, bias=bias, activation=activation)
         self.sigma_y = 0
+        self.sigma_init = 0
         self.fc = nn.Linear(in_features=hidden_size, out_features=output_size)
 
-    def update_sigmas(self, sigma_h, sigma_y):
+    def update_sigmas(self, sigma_h, sigma_y, sigma_init):
         '''To inject noise after training.'''
         self.sigma_y = sigma_y
         self.rnn_cell.sigma_h = sigma_h
+        self.sigma_init = sigma_init
+
+    def generate_observations(self, initial_input, seq_len, sigma_init, sigma_h, sigma_y, num_samples=100):
+        self.update_sigmas(sigma_h=sigma_h, sigma_y=sigma_y, sigma_init=sigma_init)
+        with torch.no_grad():
+            initial_input = initial_input.repeat(1, num_samples, 1, 1)
+            input = initial_input
+            initial_hidden = input.new_zeros(input.size(0), num_samples, self.hidden_size, requires_grad=False)
+            initial_hidden = self.rnn_cell.add_noise(initial_hidden, self.sigma_init)
+            for k in range(seq_len-1):
+                observations, (hidden, _) = self.forward(input=input, hidden=initial_hidden)
+                input = torch.cat([input, observations[:,:,-1,:].unsqueeze(dim=-2)], dim=2)
+            hidden = torch.cat([initial_hidden.unsqueeze(dim=-2), hidden], dim=-2) # adding initial hidden_state.
+        return input, hidden
+
 
     def estimate_transition_density(self, new_h, old_h):
         #TODO: to update this function with right_formula.
@@ -78,7 +94,7 @@ class OneLayerRNN(nn.Module):
     def forward(self, input, hidden=None):
         batch_size, num_particles, seq_len, hidden_size = input.size()
         if hidden is None:
-            hx = input.new_zeros(batch_size, num_particles, self.hidden_size, requires_grad=False) #TODO: add noise here also and store h0.
+            hx = input.new_zeros(batch_size, num_particles, self.hidden_size, requires_grad=False)
         else:
             hx = hidden
         ht = []
@@ -91,6 +107,8 @@ class OneLayerRNN(nn.Module):
         logits = self.fc(hidden)
         observations = self.rnn_cell.add_noise(logits, self.sigma_y) # (B,S,P,F_y)
         observations = observations.permute(0,2,1,3)
+        # TODO permute hidden as well.
+        hidden = hidden.permute(0,2,1,3)
         return observations, (hidden, hy)
 
 
