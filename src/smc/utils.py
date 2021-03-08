@@ -11,6 +11,13 @@ def resample(params, I):
     resampled_params = torch.gather(input=params, index=I, dim=1)
     return resampled_params
 
+def estimation_function_X0(k, X):
+    if k == 0:
+        out = X
+    else:
+        out = 0.
+    return out
+
 
 
 if __name__ == "__main__":

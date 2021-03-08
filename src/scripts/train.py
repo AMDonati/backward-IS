@@ -42,6 +42,7 @@ def run(args):
 
     if args.ep > 0:
         algo.train()
+        algo.save_model()
     else:
         print("skipping training...")
     algo.test()

@@ -60,6 +60,10 @@ class RNNAlgo:
                 os.makedirs(output_folder)
             return output_folder
 
+    def save_model(self):
+        with open(os.path.join(self.out_folder, "model.pt"), 'wb') as f:
+            torch.save(self.rnn, f)
+
     def eval(self, data_loader):
         self.rnn.eval()
         losses, preds = [], []

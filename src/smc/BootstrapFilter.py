@@ -1,4 +1,4 @@
-from smc.resample import resample
+from smc.utils import resample
 import torch
 import torch.nn.functional as F
 
@@ -6,7 +6,7 @@ class RNNBootstrapFilter:
     def __init__(self, num_particles, rnn):
         self.num_particles = num_particles
         self.rnn = rnn
-        self.rnn_cell = self.rnn.RNNCell
+        self.rnn_cell = self.rnn.rnn_cell
 
     def init_filtering_weights(self):
         pass
@@ -22,8 +22,7 @@ class RNNBootstrapFilter:
              :return:
              resampling weights of shape (B,P).
              '''
-        mu_t = targets - predictions  # (B,P,1,F_y)
-        mu_t = mu_t.squeeze(-2)  # removing sequence dim. # (B,P,F_y).
+        mu_t = targets - predictions  # (B,P,F_y)
         log_w = (-1 / (2 * self.rnn.sigma_y)) * torch.matmul(mu_t, mu_t.permute(0, 2, 1))  # (B,P,P)
         log_w = torch.diagonal(log_w, dim1=-2, dim2=-1)  # take the diagonal. # (B,P).
         w = F.softmax(log_w)
@@ -39,4 +38,4 @@ class RNNBootstrapFilter:
         predictions = self.rnn.fc(new_hidden)
         # compute $w_t$
         new_weights = self.compute_filtering_weights(predictions=predictions, targets=next_observation)
-        return (new_hidden, new_weights)
+        return new_hidden, new_weights

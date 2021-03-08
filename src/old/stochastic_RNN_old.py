@@ -6,7 +6,7 @@ Inspired from: https://github.com/pytorch/pytorch/issues/11335
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from smc.resample import resample
+from smc.utils import resample
 
 class RNNCell(nn.RNNCell):
     '''

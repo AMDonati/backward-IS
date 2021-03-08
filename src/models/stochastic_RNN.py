@@ -3,6 +3,13 @@ Implementation of a Stochastic RNN.
 Inspired from: https://github.com/pytorch/pytorch/issues/11335
 '''
 
+def inv_tanh(x):
+    return 1/2*torch.log((1+x)/(1-x))
+
+def derive_tanh(x):
+    return 1 - torch.pow(F.tanh(x), 2)
+
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -81,14 +88,21 @@ class OneLayerRNN(nn.Module):
             hidden = torch.cat([initial_hidden.unsqueeze(dim=-2), hidden], dim=-2) # adding initial hidden_state.
         return input, hidden
 
+    def gaussian_density_function(self, X, mean, covariance):
+        #TODO: see if we can use a torch.distribution function instead.
+        mu = X - mean   # (B,P,H)
+        density = torch.exp((-1 / (2 * covariance)) * torch.matmul(mu, mu.permute(0, 2, 1)))  # (B,P,P)
+        density = torch.diagonal(density, dim1=-2, dim2=-1)  # take the diagonal. # (B,P).
+        return density
 
-    def estimate_transition_density(self, new_h, old_h):
-        #TODO: to update this function with right_formula.
-        mu_t = new_h - old_h  # (B,P,1,F_y)
-        mu_t = mu_t.squeeze(-2)  # removing sequence dim. # (B,P,F_y).
-        log_w = (-1 / (2 * self.rnn_cell.sigma_h)) * torch.matmul(mu_t, mu_t.permute(0, 2, 1))  # (B,P,P)
-        log_w = torch.diagonal(log_w, dim1=-2, dim2=-1)  # take the diagonal. # (B,P).
-        w = F.softmax(log_w)
+    def estimate_transition_density(self, particle, ancestor):
+        # compute gaussian density of inv_tanh(new_particle)
+        d = self.gaussian_density_function(inv_tanh(particle), ancestor, self.rnn_cell.sigma_h)
+        # compute prods of 1 / derive_tanh(inv_tanh(new_particle))
+        transform = derive_tanh(inv_tanh(particle)) # (B, P, hidden)
+        inv_transform = torch.pow(transform, -1)
+        prod = inv_transform.prod(dim=-1) # (B,P)
+        w = d * prod # (B,P)
         return w
 
     def forward(self, input, hidden=None):
@@ -107,7 +121,6 @@ class OneLayerRNN(nn.Module):
         logits = self.fc(hidden)
         observations = self.rnn_cell.add_noise(logits, self.sigma_y) # (B,S,P,F_y)
         observations = observations.permute(0,2,1,3)
-        # TODO permute hidden as well.
         hidden = hidden.permute(0,2,1,3)
         return observations, (hidden, hy)
 
