@@ -3,16 +3,11 @@ Implementation of a Stochastic RNN.
 Inspired from: https://github.com/pytorch/pytorch/issues/11335
 '''
 
-def inv_tanh(x):
-    return 1/2*torch.log((1+x)/(1-x))
-
-def derive_tanh(x):
-    return 1 - torch.pow(F.tanh(x), 2)
-
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from smc.utils import inv_tanh, derive_tanh
+import torch.distributions as distrib
 
 class RNNCell(nn.RNNCell):
     '''
@@ -89,7 +84,10 @@ class OneLayerRNN(nn.Module):
         return input, hidden
 
     def gaussian_density_function(self, X, mean, covariance):
-        #TODO: see if we can use a torch.distribution function instead.
+        #distrib = torch.distributions.normal.Normal(loc=mean, scale=covariance**(1/2))
+        #dd = distrib.cdf(X)
+        #distrib_2 = torch.distributions.multivariate_normal.MultivariateNormal(loc=mean, covariance_matrix=covariance * torch.eye(mean.size(-1)))
+        #dd_2 = distrib_2.cdf(X)
         mu = X - mean   # (B,P,H)
         density = torch.exp((-1 / (2 * covariance)) * torch.matmul(mu, mu.permute(0, 2, 1)))  # (B,P,P)
         density = torch.diagonal(density, dim1=-2, dim2=-1)  # take the diagonal. # (B,P).
@@ -103,6 +101,7 @@ class OneLayerRNN(nn.Module):
         inv_transform = torch.pow(transform, -1)
         prod = inv_transform.prod(dim=-1) # (B,P)
         w = d * prod # (B,P)
+        w = F.softmax(w)
         return w
 
     def forward(self, input, hidden=None):

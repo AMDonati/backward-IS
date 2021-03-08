@@ -1,6 +1,5 @@
-#import tensorflow as tf
-import numpy as np
 import torch
+import torch.nn.functional as F
 
 def resample(params, I):
     '''
@@ -18,45 +17,33 @@ def estimation_function_X0(k, X):
         out = 0.
     return out
 
+def inv_tanh(x):
+    return 1/2*torch.log((1+x)/(1-x))
 
+def derive_tanh(x):
+    return 1 - torch.pow(F.tanh(x), 2)
 
 if __name__ == "__main__":
 
-    # ---------- test of corrected resample function -----------------------------------------------------------------------------------------------------------
+    # ---------- test of resample function -----------------------------------------------------------------------------------------------------------
     B = 2
-    S = 3
     P = 4
-    D = 1
+    D = 2
 
-    ind_matrix = tf.constant([[[1, 1, 2, 2], [0, 0, 0, 0], [1, 1, 1, 0]],
-                              [[0, 1, 3, 2], [3, 3, 2, 0], [1, 2, 3, 1]]], shape=(B, S, P))
-    ind_matrix = tf.transpose(ind_matrix, perm=[0, 2, 1])
-    # ind_matrix = tf.tile(tf.expand_dims(ind_matrix, axis=0), multiples=[B, 1, 1])  # (B,P,S)
+    ind_matrix = torch.tensor([[1,1,2,3],[0,1,3,2]])
 
-    print('indices_matrices', ind_matrix[0, :, :].numpy())
+    K = torch.tensor([[[1,5],[2,6],[3,7],[4,8]],[[13,17], [14,18], [15,19], [16,20]]])
 
-    K = tf.constant([[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]],
-                     [[13, 14, 15, 16], [17, 18, 19, 20], [21, 22, 23, 24]]], shape=(B, S, P))
-    K = tf.transpose(K, perm=[0, 2, 1])
-    K = tf.expand_dims(K, axis=-1)  # (B,P,S,D=1)
-    print('init K', K[0, :, :, 0])
+    truth = torch.tensor([[[2,6], [2,6], [3,7], [4,8]], [[13,17], [14,18], [16,20], [15,19]]])
 
-    truth_t0_b1 = tf.constant([[2, 5, 9], [2, 6, 10], [3, 7, 11], [3, 8, 12]], shape=(P, S))
-    truth_t1_b1 = tf.constant([[2, 5, 9], [2, 5, 10], [2, 5, 11], [2, 5, 12]], shape=(P, S))
-    truth_t2_b1 = tf.constant([[2, 5, 10], [2, 5, 10], [2, 5, 10], [2, 5, 9]], shape=(P, S))
-    truth_t0_b2 = tf.constant([[13, 17, 21], [14, 18, 22], [16, 19, 23], [15, 20, 24]], shape=(P, S))
-    truth_t1_b2 = tf.constant([[15, 20, 21], [15, 20, 22], [16, 19, 23], [13, 17, 24]], shape=(P, S))
-    truth_t2_b2 = tf.constant([[15, 20, 22], [16, 19, 23], [13, 17, 24], [15, 20, 22]], shape=(P, S))
+    resampled_K = resample(K, ind_matrix)
 
-    truth_t0 = tf.stack([truth_t0_b1, truth_t0_b2], axis=0)
-    truth_t1 = tf.stack([truth_t1_b1, truth_t1_b2], axis=0)
-    truth_t2 = tf.stack([truth_t2_b1, truth_t2_b2], axis=0)
-
-    new_K = K
-    for t in range(S):
-        i_t = ind_matrix[:, :, t]
-        new_K = resample(params=new_K, i_t=i_t, t=t)
-        print('new K at time_step for batch 0 {}: {}'.format(t, new_K[0, :, :, 0]))
-        print('new K at time_step for batch 1 {}: {}'.format(t, new_K[1, :, :, 0]))
+    print("TRUTH:{}", truth)
+    print("resampled_K:{}", resampled_K)
 
     # ok, test passed.
+
+    # ------------- test of inv tanh x ----------------------------------------------------------------------
+    X = torch.ones(size=(8,10,32))
+    XX = F.tanh(inv_tanh(X))
+    print(XX)

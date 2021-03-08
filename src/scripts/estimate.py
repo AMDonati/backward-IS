@@ -42,7 +42,7 @@ def run(args):
                                                   states=states, backward_samples=args.backward_samples, estimation_function=estimation_function_X0)
 
     phi = backward_is_smoother.estimate_conditional_expectation_of_function()
-
+    print("phi", phi[0])
 
 if __name__ == '__main__':
     parser = get_parser()

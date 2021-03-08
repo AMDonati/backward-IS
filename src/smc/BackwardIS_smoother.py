@@ -34,11 +34,9 @@ class RNNBackwardISSmoothing:
 
     def update_tau(self, ancestors, particle, backward_indices, IS_weights, k):
         #'''update $\tau_k^l from $\tau_{k-1}^l, $w_{k-1]^l, $\xi_{k-1}^Jk$ for all Jk(j), \Tilde(w)(l,j) for all j in 0...backward samples'''
-        sum_weights = IS_weights.sum(1) # shape (B)
         resampled_tau = resample(self.past_tau, backward_indices) # (B,backward_samples, hidden_size)
-        #resampled_states = resample(self.states[:,:,k,:], backward_indices) #k or (k-1) ? Or do we use the ancestors ? I think so...
         new_tau_element = IS_weights * (resampled_tau + self.estimation_function(k, ancestors)) # (B, backward_samples, hidden_size) # are we doing it like that ?
-        new_tau = new_tau_element.sum(1) / sum_weights
+        new_tau = new_tau_element.sum(1)
         return new_tau
 
     def estimate_conditional_expectation_of_function(self):
@@ -66,13 +64,13 @@ class RNNBackwardISSmoothing:
                     backward_indice = torch.multinomial(self.old_filtering_weights, 1) # shape (B, 1)
                     selected_backward_indices.append(backward_indice)
                     # B. Select Ancestor with J.
-                    ancestor = resample(self.ancestors, backward_indice) # shape (B, 1, hidden) #TODO: check function for one single indice.
+                    ancestor = resample(self.ancestors, backward_indice) # shape (B, 1, hidden)
                     selected_ancestors.append(ancestor)
                     # C. Compute IS weights with Ancestor & Particle.
                     is_weight = self.rnn.estimate_transition_density(ancestor=ancestor, particle=particle)
                     IS_weights.append(is_weight)
                 # End for
-                selected_ancestors = torch.stack(selected_ancestors, dim=1).squeeze() # dim (B, backward_samples, 1, hidden_size)
+                selected_ancestors = torch.stack(selected_ancestors, dim=1).squeeze() # dim (B, backward_samples, hidden_size)
                 selected_indices = torch.stack(selected_backward_indices, dim=1).squeeze() # dim (B, backward_samples)
                 IS_weights = torch.stack(IS_weights, dim=1) # dim (backward samples, B, 1)
                 # compute $\tau_k^l$ with all backward IS weights, ancestors, current particle & all backward_indices.
