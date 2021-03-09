@@ -33,6 +33,7 @@ class RNNCell(nn.RNNCell):
         return params + noise
 
     def forward(self, input, hidden=None):
+        '''forward pass of the RNN Cell computing the next hidden state $h_k$ from $h_{k-1}$ and input $Y_k$'''
         if hidden is None:
             # initialization of h to zeros tensors with same dtype & device than input.
             batch_size, num_particles, seq_len, input_size = input.size()
@@ -45,7 +46,7 @@ class RNNCell(nn.RNNCell):
         activation = F.linear(input=input, weight=self.weight_ih, bias=self.bias_ih) + F.linear(input=hx,
                                                                                         weight=self.weight_hh,
                                                                                         bias=self.bias_hh)  # shape (batch_size, hidden_size)
-        # ADDING NOISE.
+        # adding noise for the transition model P(h_{k+1} | h_k)
         activation = self.add_noise(activation, self.sigma_h)
         if self.activation_fn == 'tanh':
             hy = activation.tanh()
@@ -71,10 +72,20 @@ class OneLayerRNN(nn.Module):
         self.sigma_init = sigma_init
 
     def generate_observations(self, initial_input, seq_len, sigma_init, sigma_h, sigma_y, num_samples=100):
+        '''
+        :param initial_input: Y_0: tensor for shape (num data samples = B, 1, 1, input_size)
+        :param seq_len: length of the sequence of observations to generate.
+        :param sigma_init: $\sigma$: covariance matrix for the initial hidden state $X_0(h_0)$
+        :param sigma_h: $\nu_k$: scalar variance value of gaussian noise for the hidden state
+        :param sigma_y: $\epsilon_k$: scalar variance value of gaussian noise for the observation model.
+        :param num_samples: number of samples to generate.
+        '''
+        # Update variance values
         self.update_sigmas(sigma_h=sigma_h, sigma_y=sigma_y, sigma_init=sigma_init)
         with torch.no_grad():
             initial_input = initial_input.repeat(1, num_samples, 1, 1)
             input = initial_input
+            # initialize X_0 with gaussian noise of variance $sigma_init$.
             initial_hidden = input.new_zeros(input.size(0), num_samples, self.hidden_size, requires_grad=False)
             initial_hidden = self.rnn_cell.add_noise(initial_hidden, self.sigma_init)
             for k in range(seq_len-1):
@@ -84,6 +95,11 @@ class OneLayerRNN(nn.Module):
         return input, hidden
 
     def gaussian_density_function(self, X, mean, covariance):
+        ''' Compute the Gaussian Density Function with mean, diagonal covariance diag(covariance) at input X.
+        :param X: tensor of shape (B, P, hidden_size)
+        :param mean: tensor of shape (B, P, hidden_size)
+        :param covariance: scalar value.
+        '''
         #distrib = torch.distributions.normal.Normal(loc=mean, scale=covariance**(1/2))
         #dd = distrib.cdf(X)
         #distrib_2 = torch.distributions.multivariate_normal.MultivariateNormal(loc=mean, covariance_matrix=covariance * torch.eye(mean.size(-1)))
@@ -94,6 +110,10 @@ class OneLayerRNN(nn.Module):
         return density
 
     def estimate_transition_density(self, particle, ancestor):
+        ''' Compute the transition density function $q_k(X_{k+1}|X_k)$ for X_{K+1) = particle, and $X_k$ = ancestor.
+        :param particle $\xi_{k-1)$: shape (B, 1, hidden_size)
+        :param ancestor $\xi_{k}$: shape (B, 1, hidden_size)
+        '''
         # compute gaussian density of inv_tanh(new_particle)
         d = self.gaussian_density_function(inv_tanh(particle), ancestor, self.rnn_cell.sigma_h)
         # compute prods of 1 / derive_tanh(inv_tanh(new_particle))
@@ -101,10 +121,12 @@ class OneLayerRNN(nn.Module):
         inv_transform = torch.pow(transform, -1)
         prod = inv_transform.prod(dim=-1) # (B,P)
         w = d * prod # (B,P)
+        # normalize weights with a softmax.
         w = F.softmax(w)
         return w
 
     def forward(self, input, hidden=None):
+        '''forward pass for the RNN'''
         batch_size, num_particles, seq_len, hidden_size = input.size()
         if hidden is None:
             hx = input.new_zeros(batch_size, num_particles, self.hidden_size, requires_grad=False)
@@ -118,9 +140,10 @@ class OneLayerRNN(nn.Module):
             hx = hy
         hidden = torch.stack(ht, dim=1)
         logits = self.fc(hidden)
+        # adding noise for the observation model P(Y_{k+1} | h_k)
         observations = self.rnn_cell.add_noise(logits, self.sigma_y) # (B,S,P,F_y)
         observations = observations.permute(0,2,1,3)
-        hidden = hidden.permute(0,2,1,3)
+        hidden = hidden.permute(0,2,1,3) # shape (B,P,S,F_y)
         return observations, (hidden, hy)
 
 

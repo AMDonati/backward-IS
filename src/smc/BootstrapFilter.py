@@ -11,31 +11,37 @@ class RNNBootstrapFilter:
     def init_filtering_weights(self):
         pass
 
-    def compute_filtering_weights(self, predictions, targets):
+    def compute_filtering_weights(self, hidden, observations):
         '''
              # FORMULA
-             # logw = -0.5 * mu_t ^ T * mu_t / omega
-             # logw = logw - max(logw)
-             # w = exp(logw)
-             :param predictions: output of final layer: (B,P,1,F_y)
-             :param y: current target element > shape (B,P,1,F_y).
+             # logw = -0.5 * mu_t ^ T * mu_t / sigma; sigma=scalar covariance.
+             #  w = softmax(log_w)
+             :param hidden: hidden state at timestep k: tensor of shape (B,num_particles,1,hidden_size)
+             :param observations: current target element > shape (B,num_particles,1,F_y).
              :return:
-             resampling weights of shape (B,P).
-             '''
-        mu_t = targets - predictions  # (B,P,F_y)
+             resampling weights of shape (B,P=num_particles).
+        '''
+        # get current prediction from hidden state.
+        predictions = self.rnn.fc(hidden)
+        mu_t = observations - predictions  # (B,P,F_y)
         log_w = (-1 / (2 * self.rnn.sigma_y)) * torch.matmul(mu_t, mu_t.permute(0, 2, 1))  # (B,P,P)
         log_w = torch.diagonal(log_w, dim1=-2, dim2=-1)  # take the diagonal. # (B,P).
         w = F.softmax(log_w)
         return w
 
-
     def get_new_particle(self, observation, next_observation, hidden, weights):
-        # Mutation: compute $I_t$ from $w_{t-1}$ and resample $h_{t-1}
+        '''
+        :param observation: current observation $Y_{k}$: tensor of shape (B, P, input_size)
+        :param next_observation $Y_{k+1}$: tensor of shape (B, P, input_size)
+        :param hidden $\xi_k^l(h_k)$: current hidden state: tensor of shape (B, P, hidden_size)
+        :param $\w_{k-1}^l$: previous resampling weights: tensor of shape (B, P)
+        :return new_hidden state $\xi_{k+1}^l$: tensor of shape (B, P, hidden_size), new_weights $w_k^l$: shape (B,P).
+        '''
+        # Mutation: compute $I_t$ from $w_{t-1}$ and resample $h_{t-1}$ = \xi_{t-1}^l
         It = torch.multinomial(weights, num_samples=self.num_particles)
         resampled_h = resample(hidden, It)
-        # Selection : get $h_t$
+        # Selection : get $h_t$ = \xi_t^l
         new_hidden = self.rnn_cell(observation, resampled_h)
-        predictions = self.rnn.fc(new_hidden)
         # compute $w_t$
-        new_weights = self.compute_filtering_weights(predictions=predictions, targets=next_observation)
+        new_weights = self.compute_filtering_weights(hidden=new_hidden, observations=next_observation)
         return new_hidden, new_weights
