@@ -29,19 +29,22 @@ class RNNBootstrapFilter:
         w = F.softmax(log_w)
         return w
 
-    def get_new_particle(self, observation, next_observation, hidden, weights):
-        '''
-        :param observation: current observation $Y_{k}$: tensor of shape (B, P, input_size)
-        :param next_observation $Y_{k+1}$: tensor of shape (B, P, input_size)
-        :param hidden $\xi_k^l(h_k)$: current hidden state: tensor of shape (B, P, hidden_size)
-        :param $\w_{k-1}^l$: previous resampling weights: tensor of shape (B, P)
-        :return new_hidden state $\xi_{k+1}^l$: tensor of shape (B, P, hidden_size), new_weights $w_k^l$: shape (B,P).
-        '''
-        # Mutation: compute $I_t$ from $w_{t-1}$ and resample $h_{t-1}$ = \xi_{t-1}^l
-        It = torch.multinomial(weights, num_samples=self.num_particles)
-        resampled_h = resample(hidden, It)
+    def get_new_particle(self, observation, next_observation, hidden, weights, resampling=True):
+        #'''
+        #:param observation: current observation $Y_{k}$: tensor of shape (B, P, input_size)
+        #:param next_observation $Y_{k+1}$: tensor of shape (B, P, input_size)
+        #:param hidden $\xi_k^l(h_k)$: current hidden state: tensor of shape (B, P, hidden_size)
+        #:param $\w_{k-1}^l$: previous resampling weights: tensor of shape (B, P)
+        #:return new_hidden state $\xi_{k+1}^l$: tensor of shape (B, P, hidden_size), new_weights $w_k^l$: shape (B,P).
+        #'''
+        if resampling:
+            # Mutation: compute $I_t$ from $w_{t-1}$ and resample $h_{t-1}$ = \xi_{t-1}^l
+            It = torch.multinomial(weights, num_samples=self.num_particles)
+            resampled_h = resample(hidden, It)
+        else:
+            resampled_h = hidden
         # Selection : get $h_t$ = \xi_t^l
         new_hidden = self.rnn_cell(observation, resampled_h)
         # compute $w_t$
         new_weights = self.compute_filtering_weights(hidden=new_hidden, observations=next_observation)
-        return new_hidden, new_weights
+        return (new_hidden, resampled_h), new_weights

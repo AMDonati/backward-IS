@@ -110,10 +110,11 @@ class OneLayerRNN(nn.Module):
         return density
 
     def estimate_transition_density(self, particle, ancestor):
-        ''' Compute the transition density function $q_k(X_{k+1}|X_k)$ for X_{K+1) = particle, and $X_k$ = ancestor.
-        :param particle $\xi_{k-1)$: shape (B, 1, hidden_size)
-        :param ancestor $\xi_{k}$: shape (B, 1, hidden_size)
-        '''
+        #'''
+            #Compute the transition density function $q_k(X_{k+1}|X_k)$ for X_{K+1) = particle, and $X_k$ = ancestor.
+            #:param particle $\xi_{k-1)$: shape (B, 1, hidden_size)
+            #:param ancestor $\xi_{k}$: shape (B, 1, hidden_size)
+        #'''
         # compute gaussian density of inv_tanh(new_particle)
         d = self.gaussian_density_function(inv_tanh(particle), ancestor, self.rnn_cell.sigma_h)
         # compute prods of 1 / derive_tanh(inv_tanh(new_particle))

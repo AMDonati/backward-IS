@@ -40,10 +40,15 @@ def run(args):
     # Create the Backward IS Smoother
     backward_is_smoother = RNNBackwardISSmoothing(bootstrap_filter=rnn_bootstrap_filter, observations=observations,
                                                   states=states, backward_samples=args.backward_samples, estimation_function=estimation_function_X0)
+    # compute backward IS smoothing estimation of $mathbb[E][X_0|Y_{0:n}]$
+    phi_backward_is = backward_is_smoother.estimate_conditional_expectation_of_function()
+    loss_backward_is = backward_is_smoother.compute_mse_phi_X0(phi_backward_is)
+    print("Loss backward IS smoother", loss_backward_is)
 
-    phi = backward_is_smoother.estimate_conditional_expectation_of_function()
-    loss = backward_is_smoother.compute_mse_phi_X0(phi)
-
+    # compute poor man smoothing estimation of $mathbb[E][X_0|Y_{0:n}]$
+    phi_pms = backward_is_smoother.poor_man_smoother_estimation()
+    loss_pms = backward_is_smoother.compute_mse_phi_X0(phi_pms)
+    print("Loss poor man smoother", loss_pms)
 
 if __name__ == '__main__':
     parser = get_parser()
