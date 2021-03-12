@@ -94,7 +94,7 @@ class OneLayerRNN(nn.Module):
             hidden = torch.cat([initial_hidden.unsqueeze(dim=-2), hidden], dim=-2) # adding initial hidden_state.
         return input, hidden
 
-    def gaussian_density_function(self, X, mean, covariance):
+    def log_gaussian_density_function(self, X, mean, covariance):
         ''' Compute the Gaussian Density Function with mean, diagonal covariance diag(covariance) at input X.
         :param X: tensor of shape (B, P, hidden_size)
         :param mean: tensor of shape (B, P, hidden_size)
@@ -105,7 +105,7 @@ class OneLayerRNN(nn.Module):
         #distrib_2 = torch.distributions.multivariate_normal.MultivariateNormal(loc=mean, covariance_matrix=covariance * torch.eye(mean.size(-1)))
         #dd_2 = distrib_2.cdf(X)
         mu = X - mean   # (B,P,H)
-        density = torch.exp((-1 / (2 * covariance)) * torch.matmul(mu, mu.permute(0, 2, 1)))  # (B,P,P)
+        density = (-1 / (2 * covariance)) * torch.matmul(mu, mu.permute(0, 2, 1)) # (B,P,P)
         density = torch.diagonal(density, dim1=-2, dim2=-1)  # take the diagonal. # (B,P).
         return density
 
@@ -116,14 +116,14 @@ class OneLayerRNN(nn.Module):
             #:param ancestor $\xi_{k}$: shape (B, 1, hidden_size)
         #'''
         # compute gaussian density of inv_tanh(new_particle)
-        d = self.gaussian_density_function(inv_tanh(particle), ancestor, self.rnn_cell.sigma_h)
+        log_density = self.log_gaussian_density_function(inv_tanh(particle), ancestor, self.rnn_cell.sigma_h)
         # compute prods of 1 / derive_tanh(inv_tanh(new_particle))
         transform = derive_tanh(inv_tanh(particle)) # (B, P, hidden)
-        inv_transform = torch.pow(transform, -1)
-        prod = inv_transform.prod(dim=-1) # (B,P)
-        w = d * prod # (B,P)
+        log_inv_transform = torch.pow(transform, -1).log()
+        sum = log_inv_transform.sum(dim=-1) # (B,P)
+        log_w = log_density + sum # (B,P)
         # normalize weights with a softmax.
-        w = F.softmax(w)
+        w = F.softmax(log_w)
         return w
 
     def forward(self, input, hidden=None):
