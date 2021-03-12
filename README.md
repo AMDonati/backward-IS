@@ -37,6 +37,8 @@
             * Inverse tanh function, and tanh derivative function to compute the transition density function of the stochastic RNN
             * function to estimate: $mathbb[E][X_0|Y_{0:n}]$
  └── train: # script to train the deterministic RNN 
+ └── preprocessing # preprocess weather dataset
+ └── data_provider # class dataset with all dataset components
  
 
 
