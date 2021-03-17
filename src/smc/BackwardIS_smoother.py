@@ -110,11 +110,13 @@ class RNNBackwardISSmoothing:
                     # Select one particle.
                     particle = self.particles[:, l, :].unsqueeze(dim=1) # shape (B, 1, hidden)
                     # A. Get backward Indice J from past filtering weights
-                    backward_indices = torch.multinomial(self.old_filtering_weights, self.backward_samples) # shape (B, 1)
+                    backward_indices = torch.multinomial(self.old_filtering_weights, self.backward_samples) # shape (B, J)
                     # B. Select Ancestor with J.
-                    ancestors = resample(self.ancestors, backward_indices) # shape (B, 1, hidden)
+                    ancestors = resample(self.ancestors, backward_indices) # shape (B, J, hidden)
+                    # + select past observations with J
+                    selected_prev_observations = resample(self.observations[:,:,k,:], backward_indices) # shape (B, J, input_size)
                     # C. Compute IS weights with Ancestor & Particle.
-                    is_weights = self.rnn.estimate_transition_density(ancestor=ancestors, particle=particle)
+                    is_weights = self.rnn.estimate_transition_density(ancestor=ancestors, particle=particle, previous_observation=selected_prev_observations)
                     # End for
                     # compute $\tau_k^l$ with all backward IS weights, ancestors, current particle & all backward_indices.
                     new_tau = self.update_tau(ancestors=ancestors, particle=particle, backward_indices=backward_indices, IS_weights=is_weights.unsqueeze(-1), k=k)

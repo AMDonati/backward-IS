@@ -44,7 +44,7 @@ class RNNBootstrapFilter:
         else:
             resampled_h = hidden
         # Selection : get $h_t$ = \xi_t^l
-        new_hidden = self.rnn_cell(observation, resampled_h)
+        new_hidden, _ = self.rnn_cell(observation, resampled_h)
         # compute $w_t$
         new_weights = self.compute_filtering_weights(hidden=new_hidden, observations=next_observation)
         return (new_hidden, resampled_h), new_weights

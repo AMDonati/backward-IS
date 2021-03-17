@@ -47,12 +47,12 @@ class RNNCell(nn.RNNCell):
                                                                                         weight=self.weight_hh,
                                                                                         bias=self.bias_hh)  # shape (batch_size, hidden_size)
         # adding noise for the transition model P(h_{k+1} | h_k)
-        activation = self.add_noise(activation, self.sigma_h)
+        activation_ = self.add_noise(activation, self.sigma_h)
         if self.activation_fn == 'tanh':
-            hy = activation.tanh()
+            hy = activation_.tanh()
         elif self.activation_fn == 'relu':
-            hy = activation.relu()
-        return hy
+            hy = activation_.relu()
+        return hy, activation
 
 
 class OneLayerRNN(nn.Module):
@@ -100,30 +100,29 @@ class OneLayerRNN(nn.Module):
         :param mean: tensor of shape (B, P, hidden_size)
         :param covariance: scalar value.
         '''
-        #distrib = torch.distributions.normal.Normal(loc=mean, scale=covariance**(1/2))
-        #dd = distrib.cdf(X)
-        #distrib_2 = torch.distributions.multivariate_normal.MultivariateNormal(loc=mean, covariance_matrix=covariance * torch.eye(mean.size(-1)))
-        #dd_2 = distrib_2.cdf(X)
         mu = X - mean   # (B,P,H)
         density = (-1 / (2 * covariance)) * torch.matmul(mu, mu.permute(0, 2, 1)) # (B,P,P)
         density = torch.diagonal(density, dim1=-2, dim2=-1)  # take the diagonal. # (B,P).
         return density
 
-    def estimate_transition_density(self, particle, ancestor):
+    def estimate_transition_density(self, particle, ancestor, previous_observation):
         #'''
-            #Compute the transition density function $q_k(X_{k+1}|X_k)$ for X_{K+1) = particle, and $X_k$ = ancestor.
+            #Compute the transition density function $q_k(X_{k+1}|X_k)$ for X_{K+1) = particle, $X_k$ = ancestor and Y_k = previous_observation.
             #:param particle $\xi_{k-1)$: shape (B, 1, hidden_size)
-            #:param ancestor $\xi_{k}$: shape (B, 1, hidden_size)
+            #:param ancestor $\xi_{k}^J$: shape (B, J, hidden_size)
+            #:param previous observation $Y_{k}^J$: shape (B, J, input_size)
         #'''
-        # compute gaussian density of inv_tanh(new_particle)
-        log_density = self.log_gaussian_density_function(inv_tanh(particle), ancestor, self.rnn_cell.sigma_h)
+        # compute mean of gaussian density function from ancestor: $\mu = W_1 * ancestor + W_2 * prev_observation + b$
+        _, activation = self.rnn_cell(input=previous_observation, hidden=ancestor) # shape (B, J, hidden_size)
+        # compute gaussian density of arctanh(new_particle)
+        log_density = self.log_gaussian_density_function(X=torch.atanh(particle), mean=activation, covariance=self.rnn_cell.sigma_h)
         # compute prods of 1 / derive_tanh(inv_tanh(new_particle))
-        transform = derive_tanh(inv_tanh(particle)) # (B, P, hidden)
-        log_inv_transform = torch.pow(transform, -1).log()
-        sum = log_inv_transform.sum(dim=-1) # (B,P)
+        transform = (1-torch.pow(particle, 2)) # (1-z^2) element-wise. (B, P, hidden)
+        log_inv_transform = torch.pow(transform, -1).log() # 1 / (1-z^2) element-wise.
+        sum = log_inv_transform.sum(dim=-1) # (B,P) # sum_{i} 1 / (1-z_i^2)
         log_w = log_density + sum # (B,P)
         # normalize weights with a softmax.
-        w = F.softmax(log_w)
+        w = F.softmax(log_w, dim=-1)
         return w
 
     def forward(self, input, hidden=None):
@@ -136,7 +135,7 @@ class OneLayerRNN(nn.Module):
         ht = []
         for t in range(seq_len):
             x = input[:, :,  t, :]
-            hy = self.rnn_cell(x, hx)
+            hy, _ = self.rnn_cell(x, hx)
             ht.append(hy)
             hx = hy
         hidden = torch.stack(ht, dim=1)
