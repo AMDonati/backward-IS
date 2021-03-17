@@ -21,11 +21,11 @@ def resample_all_seq(params, i_t):
     return resampled_params
 
 
-def estimation_function_X0(k, X):
-    if k == 0:
+def estimation_function_X(k, X, index):
+    if k == index:
         out = X
     else:
-        out = 0.
+        out = X.new_zeros(X.size(0), X.size(1), X.size(2))
     return out
 
 def inv_tanh(x):

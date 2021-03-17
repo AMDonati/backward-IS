@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 from models.stochastic_RNN import OneLayerRNN
 import datetime
-from scripts.utils import create_logger, saving_training_history
+from train.utils import create_logger, saving_training_history
 import matplotlib.pyplot as plt
 
 

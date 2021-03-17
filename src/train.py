@@ -1,6 +1,6 @@
 import argparse
 from data_provider.dataset import Dataset
-from scripts.train_algo import RNNAlgo
+from train.train_algo import RNNAlgo
 
 def get_parser():
     parser = argparse.ArgumentParser()
