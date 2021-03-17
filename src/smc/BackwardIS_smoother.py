@@ -46,7 +46,7 @@ class RNNBackwardISSmoothing:
         new_tau = new_tau_element.sum(1)
         return new_tau
 
-    def estimate_conditional_expectation_of_function(self):
+    def estimate_conditional_expectation_of_function_2(self):
         with torch.no_grad():
             # for loop on time
             for k in range(self.seq_len - 1):
@@ -75,6 +75,7 @@ class RNNBackwardISSmoothing:
                         selected_ancestors.append(ancestor)
                         # C. Compute IS weights with Ancestor & Particle.
                         is_weight = self.rnn.estimate_transition_density(ancestor=ancestor, particle=particle)
+                        print(is_weight)
                         IS_weights.append(is_weight)
                     # End for
                     selected_ancestors = torch.stack(selected_ancestors, dim=1).squeeze() # dim (B, backward_samples, hidden_size)
@@ -91,6 +92,42 @@ class RNNBackwardISSmoothing:
             phi_element = self.filtering_weights.unsqueeze(-1) * self.new_tau
             phi = phi_element.sum(1) # shape (B, hidden_size)
         return phi
+
+    def estimate_conditional_expectation_of_function(self):
+        with torch.no_grad():
+            # for loop on time
+            for k in range(self.seq_len - 1):
+                # Run bootstrap filter at time k
+                self.old_filtering_weights = self.filtering_weights
+                self.past_tau = self.new_tau
+                (self.particles, _), self.filtering_weights = self.bootstrap_filter.get_new_particle(
+                    observation=self.observations[:, :, k, :], next_observation=self.observations[:, :, k + 1, :],
+                    hidden=self.ancestors, weights=self.old_filtering_weights)
+                # Backward Simulation
+                # For loop of number of particles
+                new_taus = []
+                for l in range(self.num_particles):
+                    # Select one particle.
+                    particle = self.particles[:, l, :].unsqueeze(dim=1) # shape (B, 1, hidden)
+                    # A. Get backward Indice J from past filtering weights
+                    backward_indices = torch.multinomial(self.old_filtering_weights, self.backward_samples) # shape (B, 1)
+                    # B. Select Ancestor with J.
+                    ancestors = resample(self.ancestors, backward_indices) # shape (B, 1, hidden)
+                    # C. Compute IS weights with Ancestor & Particle.
+                    is_weights = self.rnn.estimate_transition_density(ancestor=ancestors, particle=particle)
+                    # End for
+                    # compute $\tau_k^l$ with all backward IS weights, ancestors, current particle & all backward_indices.
+                    new_tau = self.update_tau(ancestors=ancestors, particle=particle, backward_indices=backward_indices, IS_weights=is_weights.unsqueeze(-1), k=k)
+                    new_taus.append(new_tau)
+                # End for
+                self.new_tau = torch.stack(new_taus, dim=1) # shape (B, num_particles, hidden_size)
+                self.ancestors = self.particles
+            # End for
+            # Compute $\phi_n$ with last filtering weights and last $tau$.
+            phi_element = self.filtering_weights.unsqueeze(-1) * self.new_tau
+            phi = phi_element.sum(1) # shape (B, hidden_size)
+        return phi
+
 
     def poor_man_smoother_estimation(self):
         with torch.no_grad():

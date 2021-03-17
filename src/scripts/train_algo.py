@@ -148,12 +148,13 @@ class RNNAlgo:
             predictions_test, _ = self.rnn(inputs)
             inputs = inputs.squeeze().cpu().numpy()
             predictions_test = predictions_test.squeeze().numpy()
-        for _ in range(10):
-            self.plot_preds_targets(inputs=inputs, predictions=predictions_test, out_folder=self.out_folder)
+        if len(predictions_test.shape) > 2:
+            for _ in range(10):
+                self.plot_preds_targets(inputs=inputs, predictions=predictions_test, out_folder=self.out_folder)
 
-    def generate_observations(self, sigma_init, sigma_h, sigma_y, num_samples):
+    def generate_observations(self, sigma_init, sigma_h, sigma_y, num_samples, num_data_samples):
         observations_folder = os.path.join(self.out_folder,
-                                           "observations_sigmainit{}_sigmah{}_sigmay{}".format(sigma_init, sigma_h,
+                                           "observations_samples{}_sigmainit{}_sigmah{}_sigmay{}".format(num_data_samples, sigma_init, sigma_h,
                                                                                                sigma_y))
         if not os.path.isdir(observations_folder):
             os.makedirs(observations_folder)
@@ -171,7 +172,7 @@ class RNNAlgo:
             loss_batch = self.criterion(mean_observations_batch, targets)
             mse += loss_batch
             if batch <= 10:
-               self.plot_preds_targets(inputs=inputs.squeeze(), predictions=mean_observations_batch.squeeze(), out_folder=observations_folder, batch=batch)
+               self.plot_preds_targets(inputs=inputs.squeeze(dim=1), predictions=mean_observations_batch.squeeze(dim=1), out_folder=observations_folder, batch=batch)
         mse = mse / len(self.test_loader)
         self.logger.info("MSE BETWEEN MEAN OBSERVATIONS AND GROUND TRUTH: {}".format(mse))
         # saving observations and states

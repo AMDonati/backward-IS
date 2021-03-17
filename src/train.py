@@ -47,16 +47,16 @@ def run(args):
         print("skipping training...")
     algo.test()
     if args.sigma_init is not None and args.sigma_h is not None and args.sigma_y is not None:
-        algo.generate_observations(sigma_init=args.sigma_init, sigma_h=args.sigma_h, sigma_y=args.sigma_y, num_samples=args.num_samples)
+        algo.generate_observations(sigma_init=args.sigma_init, sigma_h=args.sigma_h, sigma_y=args.sigma_y, num_samples=args.num_samples, num_data_samples=args.data_samples)
     else:
         list_sigmas_init = [0.001, 0.01, 0.05, 0.1]
         list_sigmas_h = [0.001, 0.01, 0.05, 0.1]
         list_sigmas_y = [0.001, 0.01, 0.05, 0.1]
-    for sigma_h, sigma_init, sigma_y in zip(list_sigmas_init, list_sigmas_h, list_sigmas_y):
-        algo.logger.info("sigma_init: {} - sigma_h: {} - sigma_y:{}".format(sigma_init, sigma_h, sigma_y))
-        algo.generate_observations(sigma_init=sigma_init, sigma_h=sigma_h, sigma_y=sigma_y,
-                                   num_samples=args.num_samples)
-        algo.logger.info("--------------------------------------------------------------------------------")
+        for sigma_h, sigma_init, sigma_y in zip(list_sigmas_init, list_sigmas_h, list_sigmas_y):
+            algo.logger.info("sigma_init: {} - sigma_h: {} - sigma_y:{}".format(sigma_init, sigma_h, sigma_y))
+            algo.generate_observations(sigma_init=sigma_init, sigma_h=sigma_h, sigma_y=sigma_y,
+                                       num_samples=args.num_samples, num_data_samples=args.data_samples)
+            algo.logger.info("--------------------------------------------------------------------------------")
 
 
 
