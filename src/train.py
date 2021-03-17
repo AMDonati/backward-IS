@@ -21,8 +21,8 @@ def get_parser():
     # generate arguments
     parser.add_argument("-bs_test", type=int, help="batch size for generating observations")
     parser.add_argument("-data_samples", type=int, default=3000, help="number of data samples in the test dataset to generate observations on.")
-    parser.add_argument("-num_samples", type=int, default=100,
-                        help="number of samples for each observation.")
+    parser.add_argument("-seq_len", type=int, default=24,
+                        help="number of observations in the sequence of observations to generate.")
     parser.add_argument("-sigma_init", type=float,
                         help="covariance matrix for initial hidden state")
     parser.add_argument("-sigma_h", type=float,
@@ -47,7 +47,7 @@ def run(args):
         print("skipping training...")
     algo.test()
     if args.sigma_init is not None and args.sigma_h is not None and args.sigma_y is not None:
-        algo.generate_observations(sigma_init=args.sigma_init, sigma_h=args.sigma_h, sigma_y=args.sigma_y, num_samples=args.num_samples, num_data_samples=args.data_samples)
+        algo.generate_observations(sigma_init=args.sigma_init, sigma_h=args.sigma_h, sigma_y=args.sigma_y, num_data_samples=args.data_samples, seq_len=args.seq_len)
     else:
         list_sigmas_init = [0.001, 0.01, 0.05, 0.1]
         list_sigmas_h = [0.001, 0.01, 0.05, 0.1]
@@ -55,7 +55,7 @@ def run(args):
         for sigma_h, sigma_init, sigma_y in zip(list_sigmas_init, list_sigmas_h, list_sigmas_y):
             algo.logger.info("sigma_init: {} - sigma_h: {} - sigma_y:{}".format(sigma_init, sigma_h, sigma_y))
             algo.generate_observations(sigma_init=sigma_init, sigma_h=sigma_h, sigma_y=sigma_y,
-                                       num_samples=args.num_samples, num_data_samples=args.data_samples)
+                                       seq_len=args.seq_len, num_data_samples=args.data_samples)
             algo.logger.info("--------------------------------------------------------------------------------")
 
 

@@ -152,9 +152,9 @@ class RNNAlgo:
             for _ in range(10):
                 self.plot_preds_targets(inputs=inputs, predictions=predictions_test, out_folder=self.out_folder)
 
-    def generate_observations(self, sigma_init, sigma_h, sigma_y, num_samples, num_data_samples):
+    def generate_observations(self, sigma_init, sigma_h, sigma_y, seq_len, num_data_samples):
         observations_folder = os.path.join(self.out_folder,
-                                           "observations_samples{}_sigmainit{}_sigmah{}_sigmay{}".format(num_data_samples, sigma_init, sigma_h,
+                                           "observations_samples{}_seqlen{}_sigmainit{}_sigmah{}_sigmay{}".format(num_data_samples, seq_len, sigma_init, sigma_h,
                                                                                                sigma_y))
         if not os.path.isdir(observations_folder):
             os.makedirs(observations_folder)
@@ -162,9 +162,8 @@ class RNNAlgo:
         mse = 0.
         for batch, (inputs, targets) in enumerate(self.test_loader):
             initial_input = inputs[:, :, 0, :].unsqueeze(dim=-2)
-            seq_len = self.dataset.seq_len
             observations_batch, hidden_batch = self.rnn.generate_observations(initial_input=initial_input, seq_len=seq_len, sigma_init=sigma_init,
-                                           sigma_h=sigma_h, sigma_y=sigma_y, num_samples=num_samples)
+                                           sigma_h=sigma_h, sigma_y=sigma_y)
             observations.append(observations_batch)
             hidden.append(hidden_batch)
             # check correctness of observations:

@@ -30,7 +30,7 @@ class RNNBackwardISSmoothing:
         self.all_IS_weights = []
 
     def init_particles(self):
-        self.ancestors = self.states[:,:,0,:] # (B, num_particles, hidden_size)
+        self.ancestors = self.states[:,:,0,:].repeat(1, self.num_particles, 1) # (B, num_particles, hidden_size)
         self.trajectories = self.ancestors.unsqueeze(-2)
         self.filtering_weights = self.bootstrap_filter.compute_filtering_weights(hidden=self.ancestors, observations=self.observations[:,:,0,:]) #decide if take $Y_0 of $Y_1$
         self.past_tau = torch.zeros(self.states.size(0), self.num_particles, self.states.size(-1))
@@ -74,10 +74,8 @@ class RNNBackwardISSmoothing:
                     backward_indices = torch.multinomial(self.old_filtering_weights, self.backward_samples) # shape (B, J)
                     # B. Select Ancestor with J.
                     ancestors = resample(self.ancestors, backward_indices) # shape (B, J, hidden)
-                    # + select past observations with J
-                    selected_prev_observations = resample(self.observations[:,:,k,:], backward_indices) # shape (B, J, input_size)
                     # C. Compute IS weights with Ancestor & Particle.
-                    is_weights = self.rnn.estimate_transition_density(ancestor=ancestors, particle=particle, previous_observation=selected_prev_observations)
+                    is_weights = self.rnn.estimate_transition_density(ancestor=ancestors, particle=particle, previous_observation=self.observations[:,:,k,:])
                     # End for
                     # compute $\tau_k^l$ with all backward IS weights, ancestors, current particle & all backward_indices.
                     new_tau = self.update_tau(ancestors=ancestors, particle=particle, backward_indices=backward_indices, IS_weights=is_weights.unsqueeze(-1), k=k)

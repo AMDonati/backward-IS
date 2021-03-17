@@ -12,6 +12,8 @@ def get_parser():
     # data parameters:
     parser.add_argument("-data_path", type=str, required=True, help="path for uploading the observations and states")
     parser.add_argument("-model_path", type=str, required=True, help="path for uploading the rnn model path")
+    parser.add_argument("-num_particles", type=int, default=100,
+                        help="number of particles for the Bootstrap Filter")
     parser.add_argument("-backward_samples", type=int, default=4,
                         help="number of backward samples for the backward IS smoother")
     parser.add_argument("-sigma_init", type=float, default=0.5,
@@ -30,12 +32,11 @@ def run(args):
     observations = torch.tensor(observations, requires_grad=False)
     states = torch.tensor(states, requires_grad=False)
 
-    num_particles = observations.size(1)
     # upload trained rnn
     rnn = torch.load(args.model_path)
     rnn.update_sigmas(sigma_init=args.sigma_init, sigma_h=args.sigma_h, sigma_y=args.sigma_y)
     # Create the bootstrap filter
-    rnn_bootstrap_filter = RNNBootstrapFilter(num_particles=num_particles, rnn=rnn)
+    rnn_bootstrap_filter = RNNBootstrapFilter(num_particles=args.num_particles, rnn=rnn)
 
     # Create the Backward IS Smoother
     backward_is_smoother = RNNBackwardISSmoothing(bootstrap_filter=rnn_bootstrap_filter, observations=observations,

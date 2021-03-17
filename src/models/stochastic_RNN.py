@@ -71,7 +71,7 @@ class OneLayerRNN(nn.Module):
         self.rnn_cell.sigma_h = sigma_h
         self.sigma_init = sigma_init
 
-    def generate_observations(self, initial_input, seq_len, sigma_init, sigma_h, sigma_y, num_samples=100):
+    def generate_observations(self, initial_input, seq_len, sigma_init, sigma_h, sigma_y):
         '''
         :param initial_input: Y_0: tensor for shape (num data samples = B, 1, 1, input_size)
         :param seq_len: length of the sequence of observations to generate.
@@ -83,10 +83,9 @@ class OneLayerRNN(nn.Module):
         # Update variance values
         self.update_sigmas(sigma_h=sigma_h, sigma_y=sigma_y, sigma_init=sigma_init)
         with torch.no_grad():
-            initial_input = initial_input.repeat(1, num_samples, 1, 1)
             input = initial_input
             # initialize X_0 with gaussian noise of variance $sigma_init$.
-            initial_hidden = input.new_zeros(input.size(0), num_samples, self.hidden_size, requires_grad=False)
+            initial_hidden = input.new_zeros(input.size(0), 1, self.hidden_size, requires_grad=False)
             initial_hidden = self.rnn_cell.add_noise(initial_hidden, self.sigma_init)
             for k in range(seq_len-1):
                 observations, (hidden, _) = self.forward(input=input, hidden=initial_hidden)
@@ -110,16 +109,17 @@ class OneLayerRNN(nn.Module):
             #Compute the transition density function $q_k(X_{k+1}|X_k)$ for X_{K+1) = particle, $X_k$ = ancestor and Y_k = previous_observation.
             #:param particle $\xi_{k-1)$: shape (B, 1, hidden_size)
             #:param ancestor $\xi_{k}^J$: shape (B, J, hidden_size)
-            #:param previous observation $Y_{k}^J$: shape (B, J, input_size)
+            #:param previous observation $Y_{k}^J$: shape (B, 1, input_size)
         #'''
         # compute mean of gaussian density function from ancestor: $\mu = W_1 * ancestor + W_2 * prev_observation + b$
+        previous_observation = previous_observation.repeat(1, ancestor.size(1), 1)
         _, activation = self.rnn_cell(input=previous_observation, hidden=ancestor) # shape (B, J, hidden_size)
         # compute gaussian density of arctanh(new_particle)
         log_density = self.log_gaussian_density_function(X=torch.atanh(particle), mean=activation, covariance=self.rnn_cell.sigma_h)
         # compute prods of 1 / derive_tanh(inv_tanh(new_particle))
-        transform = (1-torch.pow(particle, 2)) # (1-z^2) element-wise. (B, P, hidden)
+        transform = (1-torch.pow(particle, 2)) # (1-z^2) element-wise. (B, 1, hidden)
         log_inv_transform = torch.pow(transform, -1).log() # 1 / (1-z^2) element-wise.
-        sum = log_inv_transform.sum(dim=-1) # (B,P) # sum_{i} 1 / (1-z_i^2)
+        sum = log_inv_transform.sum(dim=-1) # (B,1) # sum_{i} 1 / (1-z_i^2)
         log_w = log_density + sum # (B,P)
         # normalize weights with a softmax.
         w = F.softmax(log_w, dim=-1)

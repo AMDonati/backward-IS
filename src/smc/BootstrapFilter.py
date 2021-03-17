@@ -22,7 +22,8 @@ class RNNBootstrapFilter:
              resampling weights of shape (B,P=num_particles).
         '''
         # get current prediction from hidden state.
-        predictions = self.rnn.fc(hidden)
+        predictions = self.rnn.fc(hidden) # (B, P, F_y)
+        observations = observations.repeat(1, self.num_particles, 1)
         mu_t = observations - predictions  # (B,P,F_y)
         log_w = (-1 / (2 * self.rnn.sigma_y)) * torch.matmul(mu_t, mu_t.permute(0, 2, 1))  # (B,P,P)
         log_w = torch.diagonal(log_w, dim1=-2, dim2=-1)  # take the diagonal. # (B,P).
@@ -31,7 +32,7 @@ class RNNBootstrapFilter:
 
     def get_new_particle(self, observation, next_observation, hidden, weights, resampling=True):
         #'''
-        #:param observation: current observation $Y_{k}$: tensor of shape (B, P, input_size)
+        #:param observation: current observation $Y_{k}$: tensor of shape (B, 1, input_size)
         #:param next_observation $Y_{k+1}$: tensor of shape (B, P, input_size)
         #:param hidden $\xi_k^l(h_k)$: current hidden state: tensor of shape (B, P, hidden_size)
         #:param $\w_{k-1}^l$: previous resampling weights: tensor of shape (B, P)
@@ -44,6 +45,7 @@ class RNNBootstrapFilter:
         else:
             resampled_h = hidden
         # Selection : get $h_t$ = \xi_t^l
+        observation = observation.repeat(1, self.num_particles, 1)
         new_hidden, _ = self.rnn_cell(observation, resampled_h)
         # compute $w_t$
         new_weights = self.compute_filtering_weights(hidden=new_hidden, observations=next_observation)
