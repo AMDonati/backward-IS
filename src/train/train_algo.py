@@ -166,14 +166,15 @@ class RNNAlgo:
                                            sigma_h=sigma_h, sigma_y=sigma_y)
             observations.append(observations_batch)
             hidden.append(hidden_batch)
-            # check correctness of observations:
-            mean_observations_batch = observations_batch.mean(dim=1).unsqueeze(1)
-            loss_batch = self.criterion(mean_observations_batch, targets)
-            mse += loss_batch
-            if batch <= 10:
-               self.plot_preds_targets(inputs=inputs.squeeze(dim=1), predictions=mean_observations_batch.squeeze(dim=1), out_folder=observations_folder, batch=batch)
-        mse = mse / len(self.test_loader)
-        self.logger.info("MSE BETWEEN MEAN OBSERVATIONS AND GROUND TRUTH: {}".format(mse))
+            if seq_len == targets.size(-2):
+                # check correctness of observations:
+                mean_observations_batch = observations_batch.mean(dim=1).unsqueeze(1)
+                loss_batch = self.criterion(mean_observations_batch, targets)
+                mse += loss_batch
+                if batch <= 10:
+                   self.plot_preds_targets(inputs=inputs.squeeze(dim=1), predictions=mean_observations_batch.squeeze(dim=1), out_folder=observations_folder, batch=batch)
+                mse = mse / len(self.test_loader)
+                self.logger.info("MSE BETWEEN MEAN OBSERVATIONS AND GROUND TRUTH: {}".format(mse))
         # saving observations and states
         observations = torch.stack(observations, dim=0) # (num_batch, batch_size, num_samples, seq_len, F_y)
         observations = observations.view(-1, observations.size(2), observations.size(-2), observations.size(-1))

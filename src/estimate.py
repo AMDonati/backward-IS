@@ -25,10 +25,7 @@ def get_parser():
                         help="covariance matrix for the internal gaussian noise for the observation model.")
     parser.add_argument("-debug", type=int, default=1,
                         help="debug smoothing algo or not.")
-    parser.add_argument('-test_modes', nargs='+', type=str,
-                        default=["test_images"],
-                        help="test metrics")
-    parser.add_argument("-index_states", nargs='+', type=int, default=[1, 5, 11, 17, 23],
+    parser.add_argument("-index_states", nargs='+', type=int, default=[0, 5, 11, 17, 23],
                         help='index of states to estimate.')
     parser.add_argument("-runs", type=int, default=1,
                         help="number of runs for the smoothing algo.")
