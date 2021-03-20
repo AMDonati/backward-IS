@@ -1,6 +1,6 @@
 import argparse
 from smc.BootstrapFilter import RNNBootstrapFilter
-from smc.BackwardIS_smoother import RNNBackwardISSmoothing
+from smc.BackwardIS_smoother import RNNBackwardISSmoothing, PoorManSmoothing
 from smc.utils import estimation_function_X
 from train.utils import write_to_csv
 import numpy as np
@@ -67,13 +67,20 @@ def run(args):
         results_backward, results_pms = [], []
         phis_pms, phis_backward = [], []
         errors_pms, errors_backward = [], []
+        backward_is_smoother = RNNBackwardISSmoothing(bootstrap_filter=rnn_bootstrap_filter,
+                                                      observations=observations,
+                                                      states=states, backward_samples=args.backward_samples,
+                                                      estimation_function=estimation_function_X,
+                                                      save_elements=args.debug, index_state=index_state,
+                                                      out_folder=args.data_path)
+        poor_man_smoother = PoorManSmoothing(bootstrap_filter=rnn_bootstrap_filter,
+                                             observations=observations,
+                                             states=states,
+                                             estimation_function=estimation_function_X,
+                                             index_state=index_state,
+                                             out_folder=args.data_path)
+
         for _ in range(args.runs):
-            backward_is_smoother = RNNBackwardISSmoothing(bootstrap_filter=rnn_bootstrap_filter,
-                                                          observations=observations,
-                                                          states=states, backward_samples=args.backward_samples,
-                                                          estimation_function=estimation_function_X,
-                                                          save_elements=args.debug, index_state=index_state,
-                                                          out_folder=args.data_path)
             # compute backward IS smoothing estimation of $mathbb[E][X_0|Y_{0:n}]$
             phi_backward_is = backward_is_smoother.estimate_conditional_expectation_of_function()
             backward_is_smoother.debug_elements(data_path=backward_is_out)
@@ -85,9 +92,9 @@ def run(args):
             errors_backward.append(error_backward_is)
 
             # compute poor man smoothing estimation of $mathbb[E][X_0|Y_{0:n}]$
-            phi_pms = backward_is_smoother.poor_man_smoother_estimation()
-            loss_pms, error_pms = backward_is_smoother.compute_mse_phi_X0(phi_pms)
-            backward_is_smoother.plot_estimation_versus_state(phi=phi_pms, out_folder=pms_out)
+            phi_pms = poor_man_smoother.estimate_conditional_expectation_of_function()
+            loss_pms, error_pms = poor_man_smoother.compute_mse_phi_X0(phi_pms)
+            poor_man_smoother.plot_estimation_versus_state(phi=phi_pms, out_folder=pms_out)
             print("Loss poor man smoother", loss_pms)
             results_pms.append(round(loss_pms.item(), 4))
             phis_pms.append(phi_pms)
