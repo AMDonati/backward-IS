@@ -25,6 +25,13 @@ def get_parser():
                         help="covariance matrix for the internal gaussian noise for the observation model.")
     parser.add_argument("-debug", type=int, default=1,
                         help="debug smoothing algo or not.")
+    parser.add_argument('-test_modes', nargs='+', type=str,
+                        default=["test_images"],
+                        help="test metrics")
+    parser.add_argument("-index_states", nargs='+', type=int, default=[1, 5, 11, 17, 23],
+                        help='index of states to estimate.')
+    parser.add_argument("-runs", type=int, default=1,
+                        help="number of runs for the smoothing algo.")
     return parser
 
 
@@ -50,37 +57,59 @@ def run(args):
     rnn_bootstrap_filter = RNNBootstrapFilter(num_particles=args.num_particles, rnn=rnn)
 
     # Estimate $mathbb[E][X_k | Y_{0:n}]$ for several values of k
-    index_states = [0,1,5,11,17,23]
+    index_states = args.index_states
     dict_stats = dict.fromkeys(index_states)
     for key in dict_stats.keys():
-        dict_stats[key] = {"pms": [], "backward_is": []}
+        dict_stats[key] = {"pms_mean": [], "pms_var": [], "backward_is_mean": [], "backward_is_var": []}
 
     for index_state in index_states:
-        print("-------------------------------------------------------------- k: {}-----------------------------------------------------------------------------".format(index_state))
+        print(
+            "-------------------------------------------------------------- k: {}-----------------------------------------------------------------------------".format(
+                index_state))
         # Create the Backward IS Smoother
-        backward_is_smoother = RNNBackwardISSmoothing(bootstrap_filter=rnn_bootstrap_filter, observations=observations,
-                                                      states=states, backward_samples=args.backward_samples, estimation_function=estimation_function_X, save_elements=args.debug, index_state=index_state)
-        # compute backward IS smoothing estimation of $mathbb[E][X_0|Y_{0:n}]$
-        phi_backward_is = backward_is_smoother.estimate_conditional_expectation_of_function()
-        backward_is_smoother.debug_elements(data_path=backward_is_out)
-        loss_backward_is, var_backward_is = backward_is_smoother.compute_mse_phi_X0(phi_backward_is)
-        backward_is_smoother.plot_estimation_versus_state(phi=phi_backward_is, out_folder=backward_is_out)
-        print("Loss backward IS smoother", loss_backward_is)
-        if observations.size(0) > 1:
-            print("Variance of backward is loss over multiple observations", var_backward_is)
-        dict_stats[index_state]["backward_is"] = round(loss_backward_is.item(), 4)
+        results_backward, results_pms = [], []
+        phis_pms, phis_backward = [], []
+        errors_pms, errors_backward = [], []
+        for _ in range(args.runs):
+            backward_is_smoother = RNNBackwardISSmoothing(bootstrap_filter=rnn_bootstrap_filter,
+                                                          observations=observations,
+                                                          states=states, backward_samples=args.backward_samples,
+                                                          estimation_function=estimation_function_X,
+                                                          save_elements=args.debug, index_state=index_state,
+                                                          out_folder=args.data_path)
+            # compute backward IS smoothing estimation of $mathbb[E][X_0|Y_{0:n}]$
+            phi_backward_is = backward_is_smoother.estimate_conditional_expectation_of_function()
+            backward_is_smoother.debug_elements(data_path=backward_is_out)
+            loss_backward_is, error_backward_is = backward_is_smoother.compute_mse_phi_X0(phi_backward_is)
+            backward_is_smoother.plot_estimation_versus_state(phi=phi_backward_is, out_folder=backward_is_out)
+            print("Loss backward IS smoother", loss_backward_is)
+            results_backward.append(round(loss_backward_is.item(), 4))
+            phis_backward.append(phi_backward_is)
+            errors_backward.append(error_backward_is)
 
-        # compute poor man smoothing estimation of $mathbb[E][X_0|Y_{0:n}]$
-        phi_pms = backward_is_smoother.poor_man_smoother_estimation()
-        loss_pms, var_pms = backward_is_smoother.compute_mse_phi_X0(phi_pms)
-        backward_is_smoother.plot_estimation_versus_state(phi=phi_pms, out_folder=pms_out)
-        print("Loss poor man smoother", loss_pms)
-        if observations.size(0) > 1:
-            print("Variance of poor man smoother loss over multiple observations", var_pms)
-        dict_stats[index_state]["pms"] = round(loss_pms.item(), 4)
-        print("-------------------------------------------------------------------------------------------------------------------------------------------")
+            # compute poor man smoothing estimation of $mathbb[E][X_0|Y_{0:n}]$
+            phi_pms = backward_is_smoother.poor_man_smoother_estimation()
+            loss_pms, error_pms = backward_is_smoother.compute_mse_phi_X0(phi_pms)
+            backward_is_smoother.plot_estimation_versus_state(phi=phi_pms, out_folder=pms_out)
+            print("Loss poor man smoother", loss_pms)
+            results_pms.append(round(loss_pms.item(), 4))
+            phis_pms.append(phi_pms)
+            errors_pms.append(error_pms)
+            print(
+                "-------------------------------------------------------------------------------------------------------------------------------------------")
 
-    write_to_csv(output_dir=os.path.join(args.data_path, "results.csv"), dic=dict_stats)
+        backward_is_smoother.plot_multiple_runs(phis_backward=phis_backward, phis_pms=phis_pms,
+                                                out_folder=backward_is_out, num_runs=args.runs)
+        backward_is_smoother.boxplots_error(errors_backward=errors_backward, errors_pms=errors_pms,
+                                            out_folder=backward_is_out, num_runs=args.runs)
+
+        dict_stats[index_state]["backward_is_mean"] = np.round(np.mean(results_backward), 4)
+        dict_stats[index_state]["backward_is_var"] = np.round(np.var(results_backward), 6)
+        dict_stats[index_state]["pms_mean"] = np.round(np.mean(results_pms), 4)
+        dict_stats[index_state]["pms_var"] = np.round(np.var(results_pms), 4)
+
+    write_to_csv(output_dir=os.path.join(args.data_path, "results_{}.csv".format(args.runs)), dic=dict_stats)
+
 
 if __name__ == '__main__':
     parser = get_parser()
