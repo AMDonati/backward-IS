@@ -48,6 +48,8 @@ class SmoothingAlgo:
                                                                                               :])  # decide if take $Y_0 of $Y_1$
         self.past_tau = torch.zeros(self.states.size(0), self.num_particles, self.states.size(-1))
         self.new_tau = self.past_tau
+        self.taus = []
+        self.all_IS_weights = []
 
     def plot_estimation_versus_state(self, phi, out_folder):
         estimation = phi[0].squeeze().cpu().numpy()
@@ -107,6 +109,54 @@ class SmoothingAlgo:
         fig.savefig(os.path.join(out_folder, out_file))
         plt.close()
 
+    def plot_particles_all_k(self, particles_backward, weights_backward, out_folder, num_runs, particles_pms=None,
+                             weights_pms=None):
+        particles_backward = torch.stack(particles_backward, dim=0).cpu().squeeze(1).numpy()
+        particles_pms = torch.stack(particles_pms, dim=0).cpu().squeeze(1).numpy()
+        weights_backward = torch.stack(weights_backward, dim=0).cpu().squeeze(1).numpy()
+        weights_pms = torch.stack(weights_pms, dim=0).cpu().squeeze(1).numpy()
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 12))
+        seq_len = particles_backward.shape[0]
+        parts_1 = [particles_backward[i, :, 0] for i in range(seq_len)]
+        parts_2 = [particles_backward[i, :, 1] for i in range(seq_len)]
+        parts_1_pms = [particles_pms[i, :, 0] for i in range(seq_len)]
+        parts_2_pms = [particles_pms[i, :, 1] for i in range(seq_len)]
+        bplot1 = ax1.boxplot(parts_1, patch_artist=True)
+        # bplot1_pms = ax1.boxplot(parts_1_pms, patch_artist=True)
+        for patch in bplot1['boxes']:
+            patch.set_facecolor('blue')
+        # for patch in bplot1_pms['boxes']:
+        #     patch.set_facecolor('red')
+        bplot2 = ax2.boxplot(parts_2, patch_artist=True)
+        # bplot2_pms = ax2.boxplot(parts_2_pms, patch_artist=True)
+        for patch in bplot2['boxes']:
+            patch.set_facecolor('blue')
+        # for patch in bplot2_pms['boxes']:
+        #     patch.set_facecolor('red')
+        x = np.linspace(1, seq_len, seq_len)
+        xx = np.linspace(1 - 0.02, seq_len - 0.02, seq_len)
+        xxx = np.linspace(1 + 0.02, seq_len + 0.02, seq_len)
+        if seq_len < self.states.size(-2):
+            states = self.states[:, :, :seq_len, :]
+        else:
+            states = self.states
+        for m in range(particles_backward.shape[-2]):
+            ax1.scatter(xx, particles_backward[:, m, 0], s=weights_backward[:, m] * 100, color='blue')
+            ax2.scatter(xx, particles_backward[:, m, 1], s=weights_backward[:, m] * 100, color='blue')
+            ax1.scatter(xxx, particles_pms[:, m, 0], s=weights_pms[:, m] * 100, color='red')
+            ax2.scatter(xxx, particles_pms[:, m, 1], s=weights_pms[:, m] * 100, color='red')
+        ax1.scatter(x, states[:, :, :, 0].squeeze().cpu().numpy(), color='green', marker='x')
+        ax2.scatter(x, states[:, :, :, 1].squeeze().cpu().numpy(), color='green', marker='x')
+        out_file = "particles_allseq_{}runs".format(num_runs)
+        fig.savefig(os.path.join(out_folder, out_file))
+        plt.close()
+
+    def plot_trajectories_pms(self, trajectories, out_folder):
+        trajectories = torch.stack(trajectories, dim=0).cpu().numpy()
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 12))
+        for s in range(trajectories.shape[0]):
+            pass
+
     def compute_mse_phi_X0(self, phi):
         # ''':param phi: estimation of $mathbb[E][X_0|Y_{0:n}]$: tensor of shape (B, hidden size).
         # '''
@@ -132,8 +182,6 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
                                                      index_state=index_state)
         self.backward_samples = backward_samples
         self.save_elements = save_elements
-        self.taus = []
-        self.all_IS_weights = []
         self.init_particles()
 
     def update_tau(self, ancestors, particle, backward_indices, IS_weights, k):
@@ -153,6 +201,7 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
         return new_tau
 
     def estimate_conditional_expectation_of_function(self):
+        self.init_particles()
         with torch.no_grad():
             # for loop on time
             for k in range(self.seq_len - 1):
@@ -165,6 +214,10 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
                 (self.particles, _), self.filtering_weights = self.bootstrap_filter.get_new_particle(
                     observation=self.observations[:, :, k, :], next_observation=self.observations[:, :, k + 1, :],
                     hidden=self.ancestors, weights=self.old_filtering_weights)
+                var_1 = torch.var(self.particles[:,:,0], dim=1).squeeze().numpy()
+                var_2 = torch.var(self.particles[:,:,1], dim=1).squeeze().numpy()
+                self.logger.info("BACKWARD IS - PARTICLES VARIABILITY - dim 1: {}".format(var_1.item()))
+                self.logger.info("BACKWARD IS - PARTICLES VARIABILITY - dim 2: {}".format(var_2.item()))
                 # Backward Simulation
                 # For loop of number of particles
                 new_taus, all_is_weights = [], []
@@ -175,7 +228,7 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
                     backward_indices = torch.multinomial(self.old_filtering_weights,
                                                          self.backward_samples)  # shape (B, J)
                     # B. Select Ancestor with J.
-                    ancestors = resample(self.ancestors, backward_indices)  # shape (B, J, hidden)
+                    ancestors = resample(self.ancestors, backward_indices)  # shape (B, J, hidden) # ok function resample checked.
                     # C. Compute IS weights with Ancestor & Particle.
                     is_weights = self.rnn.estimate_transition_density(ancestor=ancestors, particle=particle,
                                                                       previous_observation=self.observations[:, :, k,
@@ -188,21 +241,25 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
                     all_is_weights.append(is_weights)
                 # End for
                 self.new_tau = torch.stack(new_taus, dim=1)  # shape (B, num_particles, hidden_size)
+                var_1 = torch.var(self.new_tau[:, :, 0], dim=1).squeeze().numpy()
+                var_2 = torch.var(self.new_tau[:, :, 1], dim=1).squeeze().numpy()
+                self.logger.info("TAU VARIABILITY - dim 1: {}".format(var_1.item()))
+                self.logger.info("TAU VARIABILITY - dim 2: {}".format(var_2.item()))
                 self.ancestors = self.particles
-                if self.save_elements:
-                    self.taus.append(self.new_tau)
-                    self.logger.info("-------------TAU------------------------")
-                    self.logger.info(self.new_tau.squeeze().cpu().numpy())
-                    self.logger.info("-------------IS WEIGHTS------------------------")
-                    self.all_IS_weights.append(torch.stack(all_is_weights, dim=1))
-                    self.logger.info(torch.stack(all_is_weights, dim=1).squeeze().cpu().numpy())
-                    self.logger.info(
-                        "-------------------------------------------------------------------------------------------------------------------------------")
+                # if self.save_elements:
+                #     self.taus.append(self.new_tau)
+                #     self.logger.info("-------------TAU------------------------")
+                #     self.logger.info(self.new_tau.squeeze().cpu().numpy())
+                #     self.logger.info("-------------IS WEIGHTS------------------------")
+                #     self.all_IS_weights.append(torch.stack(all_is_weights, dim=1))
+                #     self.logger.info(torch.stack(all_is_weights, dim=1).squeeze().cpu().numpy())
+                #     self.logger.info(
+                #         "-------------------------------------------------------------------------------------------------------------------------------")
             # End for
             # Compute $\phi_n$ with last filtering weights and last $tau$.
             phi_element = self.filtering_weights.unsqueeze(-1) * self.new_tau  # TODO: should be old_filtering_weights ?
             phi = phi_element.sum(1)  # shape (B, hidden_size)
-        return phi
+        return phi, (self.new_tau, self.filtering_weights)
 
     def debug_elements(self, data_path):
         if len(self.taus) > 0:
@@ -213,6 +270,9 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
             y1 = taus[0, :, :, 0].mean(0)
             y2 = taus[0, :, :, 1].mean(0)
             ax1.plot(x, taus[0, :, :, 0].mean(0), label='dim 0 of mean tau')
+            yy1 = [taus[:, :, i, 0].squeeze() for i in range(taus.shape[-2])]
+            yy2 = [taus[:, :, i, 1].squeeze() for i in range(taus.shape[-2])]
+            ax1.boxplot(yy1)
             for xs, ys in zip(x, y1):
                 label = "{:.2f}".format(ys)
                 ax1.annotate(label,  # this is the text
@@ -221,6 +281,7 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
                              xytext=(0, 5),  # distance from text to points (x,y)
                              ha='center')  # horizontal alignment can be left, right or center
             ax2.plot(x, taus[0, :, :, 1].mean(0), label='dim 1 of mean tau')
+            ax2.boxplot(yy2)
             for xs, ys in zip(x, y2):
                 label = "{:.2f}".format(ys)
                 ax2.annotate(label,  # this is the text
@@ -247,12 +308,13 @@ class PoorManSmoothing(SmoothingAlgo):
         # :param estimation_function: Fonction to estimate: in our case $mathbb[E][X_0|Y_{0:n}]$
         # '''
         super(PoorManSmoothing, self).__init__(bootstrap_filter=bootstrap_filter, observations=observations,
-                                                     states=states, estimation_function=estimation_function,
-                                                     out_folder=out_folder,
-                                                     index_state=index_state)
+                                               states=states, estimation_function=estimation_function,
+                                               out_folder=out_folder,
+                                               index_state=index_state)
         self.init_particles()
 
     def estimate_conditional_expectation_of_function(self):
+        self.init_particles()
         with torch.no_grad():
             # for loop on time
             for k in range(self.seq_len - 1):
@@ -265,6 +327,10 @@ class PoorManSmoothing(SmoothingAlgo):
                 (self.particles, _), self.filtering_weights = self.bootstrap_filter.get_new_particle(
                     observation=self.observations[:, :, k, :], next_observation=self.observations[:, :, k + 1, :],
                     hidden=ancestor, weights=self.old_filtering_weights, resampling=False)
+                var_1 = torch.var(self.particles[:, :, 0], dim=1).squeeze().numpy()
+                var_2 = torch.var(self.particles[:, :, 1], dim=1).squeeze().numpy()
+                self.logger.info("PMS - PARTICLES VARIABILITY - dim 1: {}".format(var_1.item()))
+                self.logger.info("PMS - PARTICLES VARIABILITY - dim 2: {}".format(var_2.item()))
                 # append resampled trajectories to new particle
                 self.trajectories = torch.cat([resampled_trajectories, self.particles.unsqueeze(-2)], dim=-2)
             h_k_elements = torch.stack(
@@ -273,4 +339,4 @@ class PoorManSmoothing(SmoothingAlgo):
             h_n = h_k_elements.sum(-2)
             phi_element = self.filtering_weights.unsqueeze(-1) * h_n
             phi = phi_element.sum(1)  # (B, hidden)
-            return phi
+            return phi, (h_n, self.filtering_weights, self.trajectories)

@@ -99,10 +99,12 @@ class OneLayerRNN(nn.Module):
         :param mean: tensor of shape (B, P, hidden_size)
         :param covariance: scalar value.
         '''
-        mu = X - mean   # (B,P,H)
-        density = (-1 / (2 * covariance)) * torch.matmul(mu, mu.permute(0, 2, 1)) # (B,P,P)
-        density = torch.diagonal(density, dim1=-2, dim2=-1)  # take the diagonal. # (B,P).
-        return density
+        distrib = torch.distributions.multivariate_normal.MultivariateNormal(loc=mean, covariance_matrix=covariance * torch.eye(mean.size(-1)))
+        log_d = distrib.log_prob(X)
+        #mu = X - mean   # (B,P,H)
+        #density = (-1 / (2 * covariance)) * torch.matmul(mu, mu.permute(0, 2, 1)) # (B,P,P)
+        #density = torch.diagonal(density, dim1=-2, dim2=-1)  # take the diagonal. # (B,P).
+        return log_d
 
     def estimate_transition_density(self, particle, ancestor, previous_observation):
         #'''
