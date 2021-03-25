@@ -13,7 +13,7 @@ def get_parser():
     # data parameters:
     parser.add_argument("-data_path", type=str, required=True, help="path for uploading the observations and states")
     parser.add_argument("-model_path", type=str, required=True, help="path for uploading the rnn model path")
-    parser.add_argument("-num_particles", type=int, default=100,
+    parser.add_argument("-num_particles", type=int, default=10,
                         help="number of particles for the Bootstrap Filter")
     parser.add_argument("-backward_samples", type=int, default=4,
                         help="number of backward samples for the backward IS smoother")
@@ -25,9 +25,9 @@ def get_parser():
                         help="covariance matrix for the internal gaussian noise for the observation model.")
     parser.add_argument("-debug", type=int, default=1,
                         help="debug smoothing algo or not.")
-    parser.add_argument("-index_states", nargs='+', type=int, default=list(range(24)),
+    parser.add_argument("-index_states", nargs='+', type=int, default=[0,1,2,3,4],
                         help='index of states to estimate.')
-    parser.add_argument("-runs", type=int, default=50,
+    parser.add_argument("-runs", type=int, default=1,
                         help="number of runs for the smoothing algo.")
     return parser
 
@@ -102,7 +102,7 @@ def run(args):
             # compute poor man smoothing estimation of $mathbb[E][X_0|Y_{0:n}]$
             backward_is_smoother.logger.info(
                 "--------------------------------------------POOR MAN --------------------------------------------------------")
-            phi_pms, (particle_pms, weight_pms, trajectory_pms) = poor_man_smoother.estimate_conditional_expectation_of_function()
+            phi_pms, (particle_pms, weight_pms, trajectory_pms), (indices_matrix, particles_seq) = poor_man_smoother.estimate_conditional_expectation_of_function()
             loss_pms, error_pms = poor_man_smoother.compute_mse_phi_X0(phi_pms)
             poor_man_smoother.plot_estimation_versus_state(phi=phi_pms, out_folder=pms_out)
             print("Loss poor man smoother", loss_pms)
@@ -115,6 +115,9 @@ def run(args):
             backward_is_smoother.logger.info(
                 "-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
 
+        genealogy = poor_man_smoother.get_genealogy(indices_matrix=indices_matrix)
+        resampled_trajectories = poor_man_smoother.resample_trajectories(genealogy=genealogy, trajectories=particles_seq)
+
         backward_is_smoother.plot_multiple_runs(phis_backward=phis_backward, phis_pms=phis_pms,
                                                 out_folder=backward_is_out, num_runs=args.runs)
         backward_is_smoother.boxplots_error(errors_backward=errors_backward, errors_pms=errors_pms,
@@ -126,6 +129,8 @@ def run(args):
         dict_stats[index_state]["pms_var"] = np.round(np.var(results_pms), 8)
         dict_stats[index_state]["pms_runs"] = results_pms
         dict_stats[index_state]["backward_runs"] = results_backward
+
+    backward_is_smoother.plot_trajectories_pms(trajectories=trajectories_pms, out_folder=pms_out)
 
     if args.runs == 1:
         backward_is_smoother.plot_particles_all_k(particles_backward=particles_backward, weights_backward=weights_backward, particles_pms=particles_pms, weights_pms=weights_pms, out_folder=backward_is_out, num_runs=args.runs)

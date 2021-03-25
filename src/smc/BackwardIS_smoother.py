@@ -6,6 +6,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from train.utils import create_logger
+import random
 
 
 class SmoothingAlgo:
@@ -152,10 +153,48 @@ class SmoothingAlgo:
         plt.close()
 
     def plot_trajectories_pms(self, trajectories, out_folder):
-        trajectories = torch.stack(trajectories, dim=0).cpu().numpy()
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 12))
+        trajectories = torch.stack(trajectories, dim=0).squeeze().cpu().numpy() # (num_k, P, seq_len, hidden_size)
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 12))
+        x = np.linspace(1, trajectories.shape[1], trajectories.shape[1])
         for s in range(trajectories.shape[0]):
-            pass
+            r = random.random()
+            b = random.random()
+            g = random.random()
+            color = (r, g, b)
+            x = np.linspace(1+0.035*s, trajectories.shape[-2]+0.035*s, trajectories.shape[-2])
+            traj = trajectories[s]
+            for p in range(traj.shape[0]):
+                label1 = "trajectory for X_{} - dim 0".format(s) if p == 0 else None
+                label2 = "trajectory for X_{} - dim 1".format(s) if p == 0 else None
+                ax1.scatter(x, traj[p,:,0], color=color, label=label1, s=7)
+                ax2.scatter(x, traj[p,:,1], color=color, label=label2, s=7)
+        ax1.legend(loc='upper center')
+        ax2.legend(loc='upper center')
+        out_file = "pms_trajectories"
+        fig.savefig(os.path.join(out_folder, out_file))
+        plt.close()
+
+    def plot_trajectories_pms(self, trajectories, out_folder):
+        trajectories = torch.stack(trajectories, dim=0).squeeze().cpu().numpy() # (num_k, P, seq_len, hidden_size)
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 12))
+        x = np.linspace(1, trajectories.shape[1], trajectories.shape[1])
+        for s in range(trajectories.shape[0]):
+            r = random.random()
+            b = random.random()
+            g = random.random()
+            color = (r, g, b)
+            x = np.linspace(1+0.035*s, trajectories.shape[-2]+0.035*s, trajectories.shape[-2])
+            traj = trajectories[s]
+            for p in range(traj.shape[0]):
+                label1 = "trajectory for X_{} - dim 0".format(s) if p == 0 else None
+                label2 = "trajectory for X_{} - dim 1".format(s) if p == 0 else None
+                ax1.scatter(x, traj[p,:,0], color=color, label=label1, s=7)
+                ax2.scatter(x, traj[p,:,1], color=color, label=label2, s=7)
+        ax1.legend(loc='upper center')
+        ax2.legend(loc='upper center')
+        out_file = "pms_trajectories"
+        fig.savefig(os.path.join(out_folder, out_file))
+        plt.close()
 
     def compute_mse_phi_X0(self, phi):
         # ''':param phi: estimation of $mathbb[E][X_0|Y_{0:n}]$: tensor of shape (B, hidden size).
@@ -238,10 +277,6 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
                     all_is_weights.append(is_weights)
                 # End for
                 self.new_tau = torch.stack(new_taus, dim=1)  # shape (B, num_particles, hidden_size)
-                var_1 = torch.var(self.new_tau[:, :, 0], dim=1).squeeze().numpy()
-                var_2 = torch.var(self.new_tau[:, :, 1], dim=1).squeeze().numpy()
-                #self.logger.info("TAU VARIABILITY - dim 1: {}".format(var_1.item()))
-                #self.logger.info("TAU VARIABILITY - dim 2: {}".format(var_2.item()))
                 self.ancestors = self.particles
             # End for
             # Compute $\phi_n$ with last filtering weights and last $tau$.
@@ -305,17 +340,21 @@ class PoorManSmoothing(SmoothingAlgo):
         self.init_particles()
         with torch.no_grad():
             # for loop on time
+            indices_matrix, particles_seq = [], []
+            particles_seq.append(self.ancestors)
             for k in range(self.seq_len - 1):
                 # Selection: resample all past trajectories with current indice i_t
                 self.old_filtering_weights = self.filtering_weights
                 i_t = torch.multinomial(self.old_filtering_weights, num_samples=self.num_particles, replacement=True)
                 print("PMS filtering indices", i_t.cpu().squeeze().numpy())
+                indices_matrix.append(i_t.cpu().squeeze())
                 resampled_trajectories = resample_all_seq(self.trajectories, i_t=i_t)
                 ancestor = resampled_trajectories[:, :, k, :]  # get resampled ancestor $\xi_{k-1}$
                 # Mutation: Run bootstrap filter at time k to get new particle without resampling
                 (self.particles, _), self.filtering_weights = self.bootstrap_filter.get_new_particle(
                     observation=self.observations[:, :, k, :], next_observation=self.observations[:, :, k + 1, :],
                  hidden=ancestor, weights=self.old_filtering_weights, resampling=False)
+                particles_seq.append(self.particles)
                 # append resampled trajectories to new particle
                 self.trajectories = torch.cat([resampled_trajectories, self.particles.unsqueeze(-2)], dim=-2)
             h_k_elements = torch.stack(
@@ -324,4 +363,37 @@ class PoorManSmoothing(SmoothingAlgo):
             h_n = h_k_elements.sum(-2)
             phi_element = self.filtering_weights.unsqueeze(-1) * h_n
             phi = phi_element.sum(1)  # (B, hidden)
-            return phi, (h_n, self.filtering_weights, self.trajectories)
+            indices_matrix = torch.stack(indices_matrix, dim=0) # (seq_len, P)
+            particles_seq = torch.stack(particles_seq, dim=0)
+            return phi, (h_n, self.filtering_weights, self.trajectories), (indices_matrix.numpy(), particles_seq.squeeze().numpy())
+
+    def get_genealogy(self, indices_matrix):
+        n_particles = indices_matrix.shape[-1]
+        n_times = indices_matrix.shape[0]
+        particle_indices = np.arange(n_particles, dtype=int)
+        # Array contanant la genealogie
+        # La genealogie est un array n_times * n_particles
+        # A chaque ligne on a l'indice de particule en lequel passe la trajectoire
+        # Au debut tout le monde passe par sa particule associÃ©e.
+        genealogy = np.repeat([particle_indices], n_times+1, axis=0)
+        # Maintenant on actualise
+        for t in range(0, n_times):
+            old_genealogy = genealogy  # A chaque debut, on stocke la "vieille genealogie"
+            # Ici, pour l'exemple, un resampling uniforme
+            indice_resampling = indices_matrix[t]
+            # Maintenant, pour chaque colonne, la colonne entiere est remplacee par l'ancienne associÃ©e Ã  la particule
+            print("RESAMPLING INDICES", indice_resampling)
+            genealogy = old_genealogy[:, indice_resampling]
+            # Attention, Ã  chaque fois on restipule bien qu'au temps final, on passe par le bon indice de particule
+            genealogy[t + 1:, :] = particle_indices
+            print("GENEALOGY", genealogy)
+        return genealogy
+
+    def resample_trajectories(self, trajectories, genealogy):
+        n_particles = genealogy.shape[-1]
+        n_times = trajectories.shape[0]
+        num_dim = trajectories.shape[-1]
+        resampled_trajectories = np.zeros(shape=(n_times, n_particles, num_dim))
+        for t in reversed(range(n_times)):
+            resampled_trajectories[t, :, :] = trajectories[t, genealogy[t, :], :] # (seq_len, P, hidden_size)
+        return np.transpose(resampled_trajectories, axes=[1,0,2])
