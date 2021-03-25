@@ -25,9 +25,9 @@ def get_parser():
                         help="covariance matrix for the internal gaussian noise for the observation model.")
     parser.add_argument("-debug", type=int, default=1,
                         help="debug smoothing algo or not.")
-    parser.add_argument("-index_states", nargs='+', type=int, default=[0],
+    parser.add_argument("-index_states", nargs='+', type=int, default=list(range(24)),
                         help='index of states to estimate.')
-    parser.add_argument("-runs", type=int, default=1,
+    parser.add_argument("-runs", type=int, default=50,
                         help="number of runs for the smoothing algo.")
     return parser
 
@@ -127,7 +127,8 @@ def run(args):
         dict_stats[index_state]["pms_runs"] = results_pms
         dict_stats[index_state]["backward_runs"] = results_backward
 
-    backward_is_smoother.plot_particles_all_k(particles_backward=particles_backward, weights_backward=weights_backward, particles_pms=particles_pms, weights_pms=weights_pms, out_folder=backward_is_out, num_runs=args.runs)
+    if args.runs == 1:
+        backward_is_smoother.plot_particles_all_k(particles_backward=particles_backward, weights_backward=weights_backward, particles_pms=particles_pms, weights_pms=weights_pms, out_folder=backward_is_out, num_runs=args.runs)
 
     write_to_csv(output_dir=os.path.join(args.data_path, "results_{}.csv".format(args.runs)), dic=dict_stats)
 

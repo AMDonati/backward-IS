@@ -214,10 +214,6 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
                 (self.particles, _), self.filtering_weights = self.bootstrap_filter.get_new_particle(
                     observation=self.observations[:, :, k, :], next_observation=self.observations[:, :, k + 1, :],
                     hidden=self.ancestors, weights=self.old_filtering_weights)
-                var_1 = torch.var(self.particles[:,:,0], dim=1).squeeze().numpy()
-                var_2 = torch.var(self.particles[:,:,1], dim=1).squeeze().numpy()
-                self.logger.info("BACKWARD IS - PARTICLES VARIABILITY - dim 1: {}".format(var_1.item()))
-                self.logger.info("BACKWARD IS - PARTICLES VARIABILITY - dim 2: {}".format(var_2.item()))
                 # Backward Simulation
                 # For loop of number of particles
                 new_taus, all_is_weights = [], []
@@ -226,7 +222,8 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
                     particle = self.particles[:, l, :].unsqueeze(dim=1)  # shape (B, 1, hidden)
                     # A. Get backward Indice J from past filtering weights
                     backward_indices = torch.multinomial(self.old_filtering_weights,
-                                                         self.backward_samples)  # shape (B, J)
+                                                         self.backward_samples, replacement=True)  # shape (B, J)
+                    print("BACKWARD IS: backward_indices", backward_indices.squeeze().cpu().numpy())
                     # B. Select Ancestor with J.
                     ancestors = resample(self.ancestors, backward_indices)  # shape (B, J, hidden) # ok function resample checked.
                     # C. Compute IS weights with Ancestor & Particle.
@@ -243,21 +240,12 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
                 self.new_tau = torch.stack(new_taus, dim=1)  # shape (B, num_particles, hidden_size)
                 var_1 = torch.var(self.new_tau[:, :, 0], dim=1).squeeze().numpy()
                 var_2 = torch.var(self.new_tau[:, :, 1], dim=1).squeeze().numpy()
-                self.logger.info("TAU VARIABILITY - dim 1: {}".format(var_1.item()))
-                self.logger.info("TAU VARIABILITY - dim 2: {}".format(var_2.item()))
+                #self.logger.info("TAU VARIABILITY - dim 1: {}".format(var_1.item()))
+                #self.logger.info("TAU VARIABILITY - dim 2: {}".format(var_2.item()))
                 self.ancestors = self.particles
-                # if self.save_elements:
-                #     self.taus.append(self.new_tau)
-                #     self.logger.info("-------------TAU------------------------")
-                #     self.logger.info(self.new_tau.squeeze().cpu().numpy())
-                #     self.logger.info("-------------IS WEIGHTS------------------------")
-                #     self.all_IS_weights.append(torch.stack(all_is_weights, dim=1))
-                #     self.logger.info(torch.stack(all_is_weights, dim=1).squeeze().cpu().numpy())
-                #     self.logger.info(
-                #         "-------------------------------------------------------------------------------------------------------------------------------")
             # End for
             # Compute $\phi_n$ with last filtering weights and last $tau$.
-            phi_element = self.filtering_weights.unsqueeze(-1) * self.new_tau  # TODO: should be old_filtering_weights ?
+            phi_element = self.filtering_weights.unsqueeze(-1) * self.new_tau
             phi = phi_element.sum(1)  # shape (B, hidden_size)
         return phi, (self.new_tau, self.filtering_weights)
 
@@ -320,17 +308,14 @@ class PoorManSmoothing(SmoothingAlgo):
             for k in range(self.seq_len - 1):
                 # Selection: resample all past trajectories with current indice i_t
                 self.old_filtering_weights = self.filtering_weights
-                i_t = torch.multinomial(self.old_filtering_weights, num_samples=self.num_particles)
+                i_t = torch.multinomial(self.old_filtering_weights, num_samples=self.num_particles, replacement=True)
+                print("PMS filtering indices", i_t.cpu().squeeze().numpy())
                 resampled_trajectories = resample_all_seq(self.trajectories, i_t=i_t)
                 ancestor = resampled_trajectories[:, :, k, :]  # get resampled ancestor $\xi_{k-1}$
                 # Mutation: Run bootstrap filter at time k to get new particle without resampling
                 (self.particles, _), self.filtering_weights = self.bootstrap_filter.get_new_particle(
                     observation=self.observations[:, :, k, :], next_observation=self.observations[:, :, k + 1, :],
-                    hidden=ancestor, weights=self.old_filtering_weights, resampling=False)
-                var_1 = torch.var(self.particles[:, :, 0], dim=1).squeeze().numpy()
-                var_2 = torch.var(self.particles[:, :, 1], dim=1).squeeze().numpy()
-                self.logger.info("PMS - PARTICLES VARIABILITY - dim 1: {}".format(var_1.item()))
-                self.logger.info("PMS - PARTICLES VARIABILITY - dim 2: {}".format(var_2.item()))
+                 hidden=ancestor, weights=self.old_filtering_weights, resampling=False)
                 # append resampled trajectories to new particle
                 self.trajectories = torch.cat([resampled_trajectories, self.particles.unsqueeze(-2)], dim=-2)
             h_k_elements = torch.stack(
