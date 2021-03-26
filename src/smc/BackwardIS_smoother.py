@@ -153,46 +153,19 @@ class SmoothingAlgo:
         plt.close()
 
     def plot_trajectories_pms(self, trajectories, out_folder):
-        trajectories = torch.stack(trajectories, dim=0).squeeze().cpu().numpy() # (num_k, P, seq_len, hidden_size)
+        trajectories = trajectories.squeeze().cpu().numpy()
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 12))
         x = np.linspace(1, trajectories.shape[1], trajectories.shape[1])
-        for s in range(trajectories.shape[0]):
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
-            x = np.linspace(1+0.035*s, trajectories.shape[-2]+0.035*s, trajectories.shape[-2])
-            traj = trajectories[s]
-            for p in range(traj.shape[0]):
-                label1 = "trajectory for X_{} - dim 0".format(s) if p == 0 else None
-                label2 = "trajectory for X_{} - dim 1".format(s) if p == 0 else None
-                ax1.scatter(x, traj[p,:,0], color=color, label=label1, s=7)
-                ax2.scatter(x, traj[p,:,1], color=color, label=label2, s=7)
+        num_part = [np.unique(trajectories[:, k, :], axis=0).shape[0] for k in range(trajectories.shape[1])]
+        for p in range(trajectories.shape[0]):
+                label1 = "trajectory for  dim 0" if p == 0 else None
+                label2 = "trajectory for dim 1" if p == 0 else None
+                ax1.scatter(x, trajectories[p,:,0], label=label1, s=7)
+                 #ax2.scatter(x, trajectories[p,:,1], label=label2, s=7)
+        ax2.plot(x, num_part, label='number of unique particles')
         ax1.legend(loc='upper center')
         ax2.legend(loc='upper center')
-        out_file = "pms_trajectories"
-        fig.savefig(os.path.join(out_folder, out_file))
-        plt.close()
-
-    def plot_trajectories_pms(self, trajectories, out_folder):
-        trajectories = torch.stack(trajectories, dim=0).squeeze().cpu().numpy() # (num_k, P, seq_len, hidden_size)
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(20, 12))
-        x = np.linspace(1, trajectories.shape[1], trajectories.shape[1])
-        for s in range(trajectories.shape[0]):
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
-            x = np.linspace(1+0.035*s, trajectories.shape[-2]+0.035*s, trajectories.shape[-2])
-            traj = trajectories[s]
-            for p in range(traj.shape[0]):
-                label1 = "trajectory for X_{} - dim 0".format(s) if p == 0 else None
-                label2 = "trajectory for X_{} - dim 1".format(s) if p == 0 else None
-                ax1.scatter(x, traj[p,:,0], color=color, label=label1, s=7)
-                ax2.scatter(x, traj[p,:,1], color=color, label=label2, s=7)
-        ax1.legend(loc='upper center')
-        ax2.legend(loc='upper center')
-        out_file = "pms_trajectories"
+        out_file = "pms_trajectories_{}particles".format(self.num_particles)
         fig.savefig(os.path.join(out_folder, out_file))
         plt.close()
 
@@ -244,9 +217,9 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
         with torch.no_grad():
             # for loop on time
             for k in range(self.seq_len - 1):
-                self.logger.info(
-                    "---------------------------------------------- TIMESTEP {}-------------------------------------------------------".format(
-                        k))
+                #self.logger.info(
+                    #"---------------------------------------------- TIMESTEP {}-------------------------------------------------------".format(
+                        #k))
                 # Run bootstrap filter at time k
                 self.old_filtering_weights = self.filtering_weights
                 self.past_tau = self.new_tau
@@ -262,7 +235,6 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
                     # A. Get backward Indice J from past filtering weights
                     backward_indices = torch.multinomial(self.old_filtering_weights,
                                                          self.backward_samples, replacement=True)  # shape (B, J)
-                    print("BACKWARD IS: backward_indices", backward_indices.squeeze().cpu().numpy())
                     # B. Select Ancestor with J.
                     ancestors = resample(self.ancestors, backward_indices)  # shape (B, J, hidden) # ok function resample checked.
                     # C. Compute IS weights with Ancestor & Particle.

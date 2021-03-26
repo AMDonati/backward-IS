@@ -13,7 +13,7 @@ def get_parser():
     # data parameters:
     parser.add_argument("-data_path", type=str, required=True, help="path for uploading the observations and states")
     parser.add_argument("-model_path", type=str, required=True, help="path for uploading the rnn model path")
-    parser.add_argument("-num_particles", type=int, default=10,
+    parser.add_argument("-num_particles", type=int, default=100,
                         help="number of particles for the Bootstrap Filter")
     parser.add_argument("-backward_samples", type=int, default=4,
                         help="number of backward samples for the backward IS smoother")
@@ -25,9 +25,9 @@ def get_parser():
                         help="covariance matrix for the internal gaussian noise for the observation model.")
     parser.add_argument("-debug", type=int, default=1,
                         help="debug smoothing algo or not.")
-    parser.add_argument("-index_states", nargs='+', type=int, default=[0,1,2,3,4],
+    parser.add_argument("-index_states", nargs='+', type=int, default=list(range(24)),
                         help='index of states to estimate.')
-    parser.add_argument("-runs", type=int, default=1,
+    parser.add_argument("-runs", type=int, default=20,
                         help="number of runs for the smoothing algo.")
     return parser
 
@@ -115,8 +115,12 @@ def run(args):
             backward_is_smoother.logger.info(
                 "-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
 
-        genealogy = poor_man_smoother.get_genealogy(indices_matrix=indices_matrix)
-        resampled_trajectories = poor_man_smoother.resample_trajectories(genealogy=genealogy, trajectories=particles_seq)
+            genealogy = poor_man_smoother.get_genealogy(indices_matrix=indices_matrix)
+            resampled_trajectories = poor_man_smoother.resample_trajectories(genealogy=genealogy, trajectories=particles_seq)
+
+            backward_is_smoother.logger.info(
+                "-------------------------------- PMS  PARTICLES GENEALOGY--------------------------------")
+            backward_is_smoother.logger.info(genealogy)
 
         backward_is_smoother.plot_multiple_runs(phis_backward=phis_backward, phis_pms=phis_pms,
                                                 out_folder=backward_is_out, num_runs=args.runs)
@@ -130,7 +134,7 @@ def run(args):
         dict_stats[index_state]["pms_runs"] = results_pms
         dict_stats[index_state]["backward_runs"] = results_backward
 
-    backward_is_smoother.plot_trajectories_pms(trajectories=trajectories_pms, out_folder=pms_out)
+    backward_is_smoother.plot_trajectories_pms(trajectories=trajectory_pms, out_folder=pms_out)
 
     if args.runs == 1:
         backward_is_smoother.plot_particles_all_k(particles_backward=particles_backward, weights_backward=weights_backward, particles_pms=particles_pms, weights_pms=weights_pms, out_folder=backward_is_out, num_runs=args.runs)
