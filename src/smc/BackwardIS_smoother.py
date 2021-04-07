@@ -97,16 +97,41 @@ class SmoothingAlgo:
         plt.close()
 
     def boxplots_error(self, errors_backward, errors_pms, out_folder, num_runs):
-        errors_backward = torch.stack(errors_backward, dim=0).squeeze(1).cpu().numpy()
-        errors_pms = torch.stack(errors_pms, dim=0).squeeze(1).cpu().numpy()
-        errors_dim_backward = [errors_backward[:, dim] for dim in range(errors_backward.shape[-1])]
-        errors_dim_pms = [errors_pms[:, dim] for dim in range(errors_pms.shape[-1])]
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
-        ax1.boxplot(errors_dim_backward)
-        ax2.boxplot(errors_dim_pms)
+        backward_1 = [err[:,0] for err in errors_backward]
+        backward_2 = [err[:,1] for err in errors_backward]
+        pms_1 = [err[:, 0] for err in errors_pms]
+        pms_2 = [err[:, 1] for err in errors_pms]
+        positions_pms = np.linspace(1+0.2, len(pms_1)+0.2, len(pms_1))
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(25, 12))
+        bb1_b = ax1.boxplot(backward_1, patch_artist=True, widths=0.25, sym="")
+        bb1_p = ax1.boxplot(pms_1, patch_artist=True, positions=positions_pms, manage_ticks=False, widths=0.3, sym="")
+        bb2_b = ax2.boxplot(backward_2, patch_artist=True, widths=0.25, sym="")
+        bb2_p = ax2.boxplot(pms_2, patch_artist=True, positions=positions_pms, manage_ticks=False, widths=0.3, sym="")
+        for patch in bb1_b['boxes']:
+            patch.set_facecolor('blue')
+        for patch in bb2_b['boxes']:
+            patch.set_facecolor('blue')
+        for patch in bb1_p['boxes']:
+            patch.set_facecolor('red')
+        for patch in bb2_p['boxes']:
+            patch.set_facecolor('red')
         ax1.legend(fontsize=10)
         ax2.legend(fontsize=10)
-        out_file = "error_boxplot_X{}_{}runs".format(self.index_state, num_runs)
+        out_file = "error_boxplot_{}runs_{}particles_{}J".format(num_runs, self.num_particles, self.backward_samples)
+        fig.savefig(os.path.join(out_folder, out_file))
+        plt.close()
+
+    def boxplots_loss(self, loss_backward, loss_pms, out_folder, num_runs):
+        positions_pms = np.linspace(1+0.2, len(loss_pms)+0.2, len(loss_pms))
+        fig, ax = plt.subplots(figsize=(25, 10))
+        bb1_b = ax.boxplot(loss_backward, patch_artist=True, widths=0.25, sym="")
+        bb1_p = ax.boxplot(loss_pms, patch_artist=True, positions=positions_pms, manage_ticks=False, widths=0.25, sym="")
+        for patch in bb1_b['boxes']:
+            patch.set_facecolor('blue')
+        for patch in bb1_p['boxes']:
+            patch.set_facecolor('red')
+        ax.legend(fontsize=10)
+        out_file = "loss_boxplot_{}runs_{}particles_{}J".format(num_runs, self.num_particles, self.backward_samples)
         fig.savefig(os.path.join(out_folder, out_file))
         plt.close()
 
@@ -173,7 +198,7 @@ class SmoothingAlgo:
         # ''':param phi: estimation of $mathbb[E][X_0|Y_{0:n}]$: tensor of shape (B, hidden size).
         # '''
         criterion = nn.MSELoss(reduction='none')
-        error = phi - self.states[:, :, self.index_state, :].mean(dim=1)
+        error = phi - self.states[:, :, self.index_state, :].mean(dim=1) # hidden_size
         loss = criterion(phi, self.states[:, :, self.index_state, :].mean(dim=1))
         return loss.mean(), error
 
@@ -307,7 +332,6 @@ class PoorManSmoothing(SmoothingAlgo):
                                                out_folder=out_folder,
                                                index_state=index_state)
         self.init_particles()
-
     def estimate_conditional_expectation_of_function(self):
         self.init_particles()
         with torch.no_grad():
@@ -318,7 +342,7 @@ class PoorManSmoothing(SmoothingAlgo):
                 # Selection: resample all past trajectories with current indice i_t
                 self.old_filtering_weights = self.filtering_weights
                 i_t = torch.multinomial(self.old_filtering_weights, num_samples=self.num_particles, replacement=True)
-                print("PMS filtering indices", i_t.cpu().squeeze().numpy())
+                #print("PMS filtering indices", i_t.cpu().squeeze().numpy())
                 indices_matrix.append(i_t.cpu().squeeze())
                 resampled_trajectories = resample_all_seq(self.trajectories, i_t=i_t)
                 ancestor = resampled_trajectories[:, :, k, :]  # get resampled ancestor $\xi_{k-1}$
@@ -332,12 +356,19 @@ class PoorManSmoothing(SmoothingAlgo):
             h_k_elements = torch.stack(
                 [self.estimation_function(k=k, X=self.trajectories[:, :, k, :], index=self.index_state) for k in
                  range(self.seq_len)], dim=-2)  # (B,P,S,hidden_size)
-            h_n = h_k_elements.sum(-2)
+            h_n = h_k_elements.sum(-2) # (B,P,hidden_size)
             phi_element = self.filtering_weights.unsqueeze(-1) * h_n
             phi = phi_element.sum(1)  # (B, hidden)
             indices_matrix = torch.stack(indices_matrix, dim=0) # (seq_len, P)
             particles_seq = torch.stack(particles_seq, dim=0)
             return phi, (h_n, self.filtering_weights, self.trajectories), (indices_matrix.numpy(), particles_seq.squeeze().numpy())
+
+    def get_error(self):
+        estimation = self.trajectories * self.filtering_weights.view(self.filtering_weights.shape[0], self.filtering_weights.shape[1],1,1) # element-wise multiplication of resampled trajectories and w_n (last filtering weights)
+        estimation = estimation.sum(1) # (B,S,hidden_size) # weighted sum.
+        error = estimation - self.states.squeeze(1)
+        mse = np.square(error.numpy()).mean(-1) # shape (B,S) # square of error and mean over last dim (all dimensions of the hidden states).
+        return error.squeeze(), mse.squeeze()
 
     def get_genealogy(self, indices_matrix):
         n_particles = indices_matrix.shape[-1]
@@ -354,11 +385,11 @@ class PoorManSmoothing(SmoothingAlgo):
             # Ici, pour l'exemple, un resampling uniforme
             indice_resampling = indices_matrix[t]
             # Maintenant, pour chaque colonne, la colonne entiere est remplacee par l'ancienne associÃ©e Ã  la particule
-            print("RESAMPLING INDICES", indice_resampling)
+            #print("RESAMPLING INDICES", indice_resampling)
             genealogy = old_genealogy[:, indice_resampling]
             # Attention, Ã  chaque fois on restipule bien qu'au temps final, on passe par le bon indice de particule
             genealogy[t + 1:, :] = particle_indices
-            print("GENEALOGY", genealogy)
+            #print("GENEALOGY", genealogy)
         return genealogy
 
     def resample_trajectories(self, trajectories, genealogy):

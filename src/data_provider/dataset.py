@@ -31,7 +31,7 @@ class Dataset:
         data = np.load(file_path)
         return data
 
-    def get_datasets(self):
+    def get_datasets(self, shuffle_test=False):
         type = np.float32
         train_data = self.get_data_from_folder(self.train_path)
         train_data = train_data.astype(type)
@@ -43,7 +43,15 @@ class Dataset:
                 train_data = train_data[:self.max_samples]  # to avoid memory issues at test time.
                 print("reducing train dataset size to {} samples...".format(self.max_samples))
         if test_data.shape[0] > self.max_size_test:
-            test_data = test_data[:self.max_size_test]  # to avoid memory issues at test time.
+            if self.max_size_test == 1 and shuffle_test:
+                index = np.random.randint(test_data.shape[0])
+                print("index sample for test data", index)
+                test_data = test_data[index]
+                test_data = test_data[np.newaxis, :, :]
+                self.index_test = index
+            else:
+                test_data = test_data[:self.max_size_test]  # to avoid memory issues at test time.
+                self.index_test = None
             print("reducing test dataset size to {} samples...".format(self.max_size_test))
         test_data = test_data.astype(type)
         return train_data, val_data, test_data
@@ -62,7 +70,7 @@ class Dataset:
             assert inp[:, 1:, :] == tar[:, :-1, :], "error in inputs/targets of dataset"
 
     def data_to_dataset(self, args, num_dim=4):
-        train_data, val_data, test_data = self.get_datasets()
+        train_data, val_data, test_data = self.get_datasets(shuffle_test=args.shuffle_test)
         (X_train, y_train), (X_val, y_val), (X_test, y_test) = self.get_features_labels(train_data=train_data,
                                                                                         val_data=val_data,
                                                                                         test_data=test_data)

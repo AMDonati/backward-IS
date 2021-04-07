@@ -156,6 +156,8 @@ class RNNAlgo:
         observations_folder = os.path.join(self.out_folder,
                                            "observations_samples{}_seqlen{}_sigmainit{}_sigmah{}_sigmay{}".format(num_data_samples, seq_len, sigma_init, sigma_h,
                                                                                                sigma_y))
+        if self.dataset.index_test is not None:
+            observations_folder = observations_folder + '_index{}'.format(self.dataset.index_test)
         if not os.path.isdir(observations_folder):
             os.makedirs(observations_folder)
         observations, hidden = [], []
