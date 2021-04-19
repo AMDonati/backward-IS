@@ -6,8 +6,8 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8g
-#SBATCH --output=slurm_out/h64-4j-100S-j.out
-#SBATCH --error=slurm_outh64-4j-100S-j/.err
+#SBATCH --output=slurm_out/h64-4j-100S-%j.out
+#SBATCH --error=slurm_outh64-4j-100S-%j/.err
 #SBATCH --time=10:00:00
 
 export TMPDIR=$JOBSCRATCH
@@ -17,8 +17,8 @@ conda activate back-is
 
 export PYTHONPATH=src:${PYTHONPATH}
 
-DATA_PATH="output/RNN_weather/RNN_h32_ep15_bs64_maxsamples20000/20210417-080320/observations_samples1_seqlen101_sigmainit0.1_sigmah0.1_sigmay0.1"
-MODEL_PATH="output/RNN_weather/RNN_h32_ep15_bs64_maxsamples20000/20210417-080320/model.pt"
+DATA_PATH="output/RNN_weather/RNN_h64_ep15_bs64_maxsamples20000/20210416-225828/observations_samples1_seqlen101_sigmainit0.1_sigmah0.1_sigmay0.1"
+MODEL_PATH="output/RNN_weather/RNN_h64_ep15_bs64_maxsamples20000/20210416-225828/model.pt"
 SIGMA_INIT=0.1
 SIGMA_Y=0.1
 SIGMA_H=0.1
