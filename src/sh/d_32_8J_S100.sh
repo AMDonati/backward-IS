@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=debug
+#SBATCH --job-name=d32-8j-S100
 #SBATCH --qos=qos_gpu-t3
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8g
 #SBATCH --output=slurm_out/h32-8J-100S-%j.out
-#SBATCH --error=slurm_out/debug-j.err
+#SBATCH --error=slurm_out/h32-8J-100S-%j.err
 #SBATCH --time=10:00:00
 
 export TMPDIR=$JOBSCRATCH
