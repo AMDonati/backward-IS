@@ -18,7 +18,7 @@ conda activate back-is
 export PYTHONPATH=src:${PYTHONPATH}
 
 DATA_PATH="output/RNN_weather/RNN_h64_ep15_bs64_maxsamples20000/20210416-225828/observations_samples1_seqlen25_sigmainit0.1_sigmah0.1_sigmay0.1"
-MODEL_PATH="output/RNN_weather/RNN_h32_ep15_bs64_maxsamples20000/20210417-080320/model.pt"
+MODEL_PATH="output/RNN_weather/RNN_h64_ep15_bs64_maxsamples20000/20210416-225828/model.pt"
 SIGMA_INIT=0.1
 SIGMA_Y=0.1
 SIGMA_H=0.1

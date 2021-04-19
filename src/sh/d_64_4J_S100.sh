@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=h64-4J-24S
+#SBATCH --job-name=h64-4J-100S
 #SBATCH --qos=qos_gpu-t3
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8g
 #SBATCH --output=slurm_out/h64-4j-100S-%j.out
-#SBATCH --error=slurm_outh64-4j-100S-%j/.err
+#SBATCH --error=slurm_out/h64-4j-100S-%j.err
 #SBATCH --time=10:00:00
 
 export TMPDIR=$JOBSCRATCH
