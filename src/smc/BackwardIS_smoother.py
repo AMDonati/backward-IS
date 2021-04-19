@@ -96,7 +96,7 @@ class SmoothingAlgo:
         fig.savefig(os.path.join(out_folder, out_file))
         plt.close()
 
-    def boxplots_error(self, errors_backward, errors_pms, out_folder, num_runs):
+    def boxplots_error(self, errors_backward, errors_pms, out_folder, num_runs, index_states):
         backward_1 = [err[:,0] for err in errors_backward]
         backward_2 = [err[:,1] for err in errors_backward]
         pms_1 = [err[:, 0] for err in errors_pms]
@@ -108,6 +108,7 @@ class SmoothingAlgo:
         xx = np.linspace(1, len(pms_1), len(pms_1))
         positions_pms = np.linspace(1+0.2, len(pms_1)+0.2, len(pms_1))
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(25, 12))
+        labels = ["X_{}".format(k) for k in index_states]
         bb1_b = ax1.boxplot(backward_1, patch_artist=True, widths=0.25, sym="")
         bb1_p = ax1.boxplot(pms_1, patch_artist=True, positions=positions_pms, manage_ticks=False, widths=0.3, sym="")
         bb2_b = ax2.boxplot(backward_2, patch_artist=True, widths=0.25, sym="")
@@ -120,10 +121,14 @@ class SmoothingAlgo:
             patch.set_facecolor('red')
         for patch in bb2_p['boxes']:
             patch.set_facecolor('red')
+        plt.sca(ax1)
+        plt.xticks(labels=labels, ticks=xx)
         ax1.plot(xx, mean_backward_1, color='blue', label='backward IS Smoother')
         ax1.plot(positions_pms, mean_pms_1, color='red', label='PMS Smoother')
         ax2.plot(xx, mean_backward_2, color='blue')
         ax2.plot(positions_pms, mean_pms_2, color='red')
+        plt.sca(ax2)
+        plt.xticks(labels=labels, ticks=xx)
         ax1.legend(fontsize=10)
         ax2.legend(fontsize=10)
         ax1.grid('on')
@@ -133,10 +138,11 @@ class SmoothingAlgo:
         fig.savefig(os.path.join(out_folder, out_file))
         plt.close()
 
-    def boxplots_loss(self, loss_backward, loss_pms, out_folder, num_runs):
+    def boxplots_loss(self, loss_backward, loss_pms, out_folder, num_runs, index_states):
         xx = np.linspace(1, len(loss_pms), len(loss_pms))
         positions_pms = np.linspace(1+0.2, len(loss_pms)+0.2, len(loss_pms))
         fig, ax = plt.subplots(figsize=(25, 10))
+        labels = ["X_{}".format(k) for k in index_states]
         bb1_b = ax.boxplot(loss_backward, patch_artist=True, widths=0.25, sym="")
         bb1_p = ax.boxplot(loss_pms, patch_artist=True, positions=positions_pms, manage_ticks=False, widths=0.25, sym="")
         mean_backward = [np.mean(l) for l in loss_backward]
@@ -147,6 +153,7 @@ class SmoothingAlgo:
             patch.set_facecolor('red')
         ax.plot(xx, mean_backward, color='blue', label='Backward IS Smoother')
         ax.plot(positions_pms, mean_pms, color='red', label='PMS Smoother')
+        plt.xticks(ticks=xx, labels=labels)
         ax.legend(fontsize=12)
         ax.grid('on')
         ax.set_title('Boxplot of squared error', fontsize=18)
@@ -154,29 +161,20 @@ class SmoothingAlgo:
         fig.savefig(os.path.join(out_folder, out_file))
         plt.close()
 
-    def plot_particles_all_k(self, particles_backward, weights_backward, out_folder, num_runs, particles_pms=None,
+    def plot_particles_all_k(self, particles_backward, weights_backward, out_folder, num_runs, index_states, particles_pms=None,
                              weights_pms=None):
         particles_backward = torch.stack(particles_backward, dim=0).cpu().squeeze(1).numpy()
-        particles_pms = torch.stack(particles_pms, dim=0).cpu().squeeze(1).numpy()
+        particles_pms = particles_pms.cpu().squeeze(0).numpy().transpose(1,0,2)
         weights_backward = torch.stack(weights_backward, dim=0).cpu().squeeze(1).numpy()
-        weights_pms = torch.stack(weights_pms, dim=0).cpu().squeeze(1).numpy()
+        weights_pms = weights_pms.repeat(weights_backward.shape[0], 1).numpy()
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 12))
+        labels = ["X_{}".format(k) for k in index_states]
         seq_len = particles_backward.shape[0]
-        parts_1 = [particles_backward[i, :, 0] for i in range(seq_len)]
-        parts_2 = [particles_backward[i, :, 1] for i in range(seq_len)]
-        parts_1_pms = [particles_pms[i, :, 0] for i in range(seq_len)]
-        parts_2_pms = [particles_pms[i, :, 1] for i in range(seq_len)]
-        bplot1 = ax1.boxplot(parts_1, patch_artist=True)
-        for patch in bplot1['boxes']:
-            patch.set_facecolor('blue')
-        bplot2 = ax2.boxplot(parts_2, patch_artist=True)
-        for patch in bplot2['boxes']:
-            patch.set_facecolor('blue')
         x = np.linspace(1, seq_len, seq_len)
         xx = np.linspace(1 - 0.02, seq_len - 0.02, seq_len)
         xxx = np.linspace(1 + 0.02, seq_len + 0.02, seq_len)
         if seq_len < self.states.size(-2):
-            states = self.states[:, :, :seq_len, :]
+            states = self.states[:, :, index_states, :]
         else:
             states = self.states
         for m in range(particles_backward.shape[-2]):
@@ -186,7 +184,11 @@ class SmoothingAlgo:
             ax2.scatter(xxx, particles_pms[:, m, 1], s=weights_pms[:, m] * 100, color='red')
         ax1.scatter(x, states[:, :, :, 0].squeeze().cpu().numpy(), color='green', marker='x')
         ax2.scatter(x, states[:, :, :, 1].squeeze().cpu().numpy(), color='green', marker='x')
-        out_file = "particles_allseq_{}runs".format(num_runs)
+        plt.sca(ax1)
+        plt.xticks(ticks=xx, labels=labels)
+        plt.sca(ax2)
+        plt.xticks(ticks=xx, labels=labels)
+        out_file = "particles_allseq_{}particles_{}runs_{}J".format(self.num_particles, num_runs, self.backward_samples)
         fig.savefig(os.path.join(out_folder, out_file))
         plt.close()
 

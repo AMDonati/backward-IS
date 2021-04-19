@@ -24,9 +24,6 @@ class RNNBootstrapFilter:
         # get current prediction from hidden state.
         predictions = self.rnn.fc(hidden) # (B, P, F_y)
         observations = observations.repeat(1, self.num_particles, 1)
-        #mu_t = observations - predictions  # (B,P,F_y)
-        #log_w = (-1 / (2 * self.rnn.sigma_y)) * torch.matmul(mu_t, mu_t.permute(0, 2, 1))  # (B,P,P)
-        # = torch.diagonal(log_w, dim1=-2, dim2=-1)  # take the diagonal. # (B,P).
         log_w = self.rnn.log_gaussian_density_function(X=observations, mean=predictions, covariance=self.rnn.sigma_y)
         w = F.softmax(log_w)
         return w
