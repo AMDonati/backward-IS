@@ -27,6 +27,7 @@ SIGMA_H=0.1
 NUM_PARTICLES=1000
 BACKWARD_SAMPLES=32
 RUNS=1
+PMS=0
 
 set -x
 echo "now processing task id:: " ${SLURM_ARRAY_TASK_ID}
