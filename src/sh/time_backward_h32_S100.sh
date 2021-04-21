@@ -30,24 +30,19 @@ PMS=1
 PARTICLES_PMS=10000
 
 set -x
-srun python -u src/estimate.py -data_path $DATA_PATH -model_path $MODEL_PATH -out_path $OUT_PATH -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -sigma_init $SIGMA_INIT -sigma_y $SIGMA_Y -sigma_h $SIGMA_H -runs $RUNS -pms $PMS -particles_pms $PARTICLES_PMS
-
-PARTICLES_PMS=9000
+PARTICLES_PMS=4000
 
 srun python -u src/estimate.py -data_path $DATA_PATH -model_path $MODEL_PATH -out_path $OUT_PATH -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -sigma_init $SIGMA_INIT -sigma_y $SIGMA_Y -sigma_h $SIGMA_H -runs $RUNS -pms $PMS -particles_pms $PARTICLES_PMS
 
-PARTICLES_PMS=8000
+PARTICLES_PMS=3000
 
 srun python -u src/estimate.py -data_path $DATA_PATH -model_path $MODEL_PATH -out_path $OUT_PATH -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -sigma_init $SIGMA_INIT -sigma_y $SIGMA_Y -sigma_h $SIGMA_H -runs $RUNS -pms $PMS -particles_pms $PARTICLES_PMS
 
-PARTICLES_PMS=7000
+PARTICLES_PMS=2000
 
 srun python -u src/estimate.py -data_path $DATA_PATH -model_path $MODEL_PATH -out_path $OUT_PATH -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -sigma_init $SIGMA_INIT -sigma_y $SIGMA_Y -sigma_h $SIGMA_H -runs $RUNS -pms $PMS -particles_pms $PARTICLES_PMS
 
-PARTICLES_PMS=6000
 
-srun python -u src/estimate.py -data_path $DATA_PATH -model_path $MODEL_PATH -out_path $OUT_PATH -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -sigma_init $SIGMA_INIT -sigma_y $SIGMA_Y -sigma_h $SIGMA_H -runs $RUNS -pms $PMS -particles_pms $PARTICLES_PMS
-
-PARTICLES_PMS=5000
+PARTICLES_PMS=1000
 
 srun python -u src/estimate.py -data_path $DATA_PATH -model_path $MODEL_PATH -out_path $OUT_PATH -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -sigma_init $SIGMA_INIT -sigma_y $SIGMA_Y -sigma_h $SIGMA_H -runs $RUNS -pms $PMS -particles_pms $PARTICLES_PMS
