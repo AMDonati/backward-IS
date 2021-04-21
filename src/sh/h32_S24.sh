@@ -20,7 +20,6 @@ export PYTHONPATH=src:${PYTHONPATH}
 
 DATA_PATH="output/RNN_weather/RNN_h32_ep15_bs64_maxsamples20000/20210417-080320/observations_samples1_seqlen25_sigmainit0.1_sigmah0.1_sigmay0.1"
 MODEL_PATH="output/RNN_weather/RNN_h32_ep15_bs64_maxsamples20000/20210417-080320/model.pt"
-OUT_PATH="time_backward"
 SIGMA_INIT=0.1
 SIGMA_Y=0.1
 SIGMA_H=0.1
@@ -32,5 +31,6 @@ PARTICLES_PMS=12000
 
 set -x
 echo "now processing task id:: " ${SLURM_ARRAY_TASK_ID}
-srun python -u src/estimate.py -data_path $DATA_PATH -model_path $MODEL_PATH -out_path ${SLURM_ARRAY_TASK_ID} -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -sigma_init $SIGMA_INIT -sigma_y $SIGMA_Y -sigma_h $SIGMA_H -runs $RUNS -pms $PMS -particles_pms $PARTICLES_PMS
+OUT_PATH=100_runs/${SLURM_ARRAY_TASK_ID}
+srun python -u src/estimate.py -data_path $DATA_PATH -model_path $MODEL_PATH -out_path ${OUT_PATH} -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -sigma_init $SIGMA_INIT -sigma_y $SIGMA_Y -sigma_h $SIGMA_H -runs $RUNS -pms $PMS -particles_pms $PARTICLES_PMS
 exit 0

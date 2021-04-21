@@ -14,11 +14,11 @@ def get_parser():
     parser.add_argument("-data_path", type=str, required=True, help="path for uploading the observations and states")
     parser.add_argument("-model_path", type=str, required=True, help="path for uploading the rnn model path")
     parser.add_argument("-out_path", type=str, default="experiments")
-    parser.add_argument("-num_particles", type=int, default=1000,
+    parser.add_argument("-num_particles", type=int, default=10,
                         help="number of particles for the Bootstrap Filter")
-    parser.add_argument("-particles_pms", type=int, default=12000,
+    parser.add_argument("-particles_pms", type=int, default=5,
                         help="number of particles for the Bootstrap Filter for PMS algo.")
-    parser.add_argument("-backward_samples", type=int, default=32,
+    parser.add_argument("-backward_samples", type=int, default=4,
                         help="number of backward samples for the backward IS smoother")
     parser.add_argument("-sigma_init", type=float, default=0.1,
                         help="covariance matrix for initial hidden state")
@@ -28,13 +28,13 @@ def get_parser():
                         help="covariance matrix for the internal gaussian noise for the observation model.")
     parser.add_argument("-debug", type=int, default=1,
                         help="debug smoothing algo or not.")
-    parser.add_argument("-index_states", nargs='+', type=int, default=[0],
+    parser.add_argument("-index_states", nargs='+', type=int, default=[0,10],
                         help='index of states to estimate.')
     parser.add_argument("-runs", type=int, default=1,
                         help="number of runs for the smoothing algo.")
     parser.add_argument("-backward_is", type=int, default=1,
                         help="debug smoothing algo or not.")
-    parser.add_argument("-pms", type=int, default=1,
+    parser.add_argument("-pms", type=int, default=0,
                         help="debug smoothing algo or not.")
     return parser
 

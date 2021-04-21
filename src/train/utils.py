@@ -1,14 +1,19 @@
 import logging
 import os
 import csv
+import pandas as pd
 
 
-def write_to_csv(output_dir, dic):
+def write_to_csv_old(output_dir, dic):
     """Write a python dic to csv."""
     with open(output_dir, 'w') as csv_file:
         writer = csv.writer(csv_file)
         for key, value in dic.items():
             writer.writerow([key, value])
+
+
+def write_to_csv(output_dir, dic):
+    pd.DataFrame(data=dic).to_csv(output_dir)
 
 
 def create_logger(out_file_log):
