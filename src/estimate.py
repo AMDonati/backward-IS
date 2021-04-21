@@ -16,7 +16,9 @@ def get_parser():
     parser.add_argument("-out_path", type=str, default="experiments")
     parser.add_argument("-num_particles", type=int, default=1000,
                         help="number of particles for the Bootstrap Filter")
-    parser.add_argument("-backward_samples", type=int, default=4,
+    parser.add_argument("-particles_pms", type=int, default=12000,
+                        help="number of particles for the Bootstrap Filter for PMS algo.")
+    parser.add_argument("-backward_samples", type=int, default=32,
                         help="number of backward samples for the backward IS smoother")
     parser.add_argument("-sigma_init", type=float, default=0.1,
                         help="covariance matrix for initial hidden state")
@@ -32,7 +34,7 @@ def get_parser():
                         help="number of runs for the smoothing algo.")
     parser.add_argument("-backward_is", type=int, default=1,
                         help="debug smoothing algo or not.")
-    parser.add_argument("-pms", type=int, default=0,
+    parser.add_argument("-pms", type=int, default=1,
                         help="debug smoothing algo or not.")
     return parser
 
@@ -156,6 +158,7 @@ def run(args):
     rnn.update_sigmas(sigma_init=args.sigma_init, sigma_h=args.sigma_h, sigma_y=args.sigma_y)
     # Create the bootstrap filter
     rnn_bootstrap_filter = RNNBootstrapFilter(num_particles=args.num_particles, rnn=rnn)
+    rnn_bootstrap_filter_pms = RNNBootstrapFilter(num_particles=args.particles_pms, rnn=rnn)
 
     # Estimate $mathbb[E][X_k | Y_{0:n}]$ for several values of k
     index_states = args.index_states
@@ -200,7 +203,7 @@ def run(args):
             dict_errors = fill_dict_backward(dict=dict_errors, index_state=index_state, results_backward=errors_backward, stack=True, stats=False)
 
         np.save(os.path.join(backward_is_out, "phis_backward.npy"), torch.stack(phis_backward).cpu().squeeze().numpy())
-        poor_man_smoother = PoorManSmoothing(bootstrap_filter=rnn_bootstrap_filter,
+        poor_man_smoother = PoorManSmoothing(bootstrap_filter=rnn_bootstrap_filter_pms,
                                          observations=observations,
                                          states=states,
                                          estimation_function=estimation_function_X,
@@ -208,7 +211,7 @@ def run(args):
                                          out_folder=out_path, logger=backward_is_smoother.logger)
 
     else:
-        poor_man_smoother = PoorManSmoothing(bootstrap_filter=rnn_bootstrap_filter,
+        poor_man_smoother = PoorManSmoothing(bootstrap_filter=rnn_bootstrap_filter_pms,
                                              observations=observations,
                                              states=states,
                                              estimation_function=estimation_function_X,
@@ -225,6 +228,7 @@ def run(args):
             "--------------------------------------------POOR MAN --------------------------------------------------------")
             indices_matrix, particles_seq = poor_man_smoother.estimate_conditional_expectation_of_function()
             error_pms, loss_pms, phi_pms = poor_man_smoother.get_error()
+            print("loss PMS smoother", loss_pms)
             results_pms.append(loss_pms)
             errors_pms.append(error_pms)
             phis_pms.append(phi_pms[index_states])
@@ -241,20 +245,21 @@ def run(args):
 
         particles_pms = poor_man_smoother.trajectories[:,:,index_states,:]
 
-        if args.backward_is:
-            seq_errors_backward = [dict_errors[k]["backward_runs"] for k in dict_errors.keys()]
-            seq_loss_backward = [dict_results[k]["backward_runs"] for k in dict_results.keys()]
-            for k in dict_errors.keys():
-                np.save(os.path.join(backward_is_out, "backward_errors_X_{}".format(k)), dict_errors[k]["backward_runs"].squeeze())
-        else:
-            seq_errors_backward, seq_loss_backward = [], []
-        if args.pms:
-            seq_loss_pms = [dict_results[k]["pms_runs"] for k in dict_results.keys()]
-            seq_errors_pms = [dict_errors[k]["pms_runs"] for k in dict_errors.keys()]
-            for k in dict_errors.keys():
-                np.save(os.path.join(pms_out, "pms_errors_X_{}".format(k)), dict_errors[k]["pms_runs"].squeeze())
-        else:
-            seq_errors_pms, seq_loss_pms = [], []
+    if args.backward_is:
+        seq_errors_backward = [dict_errors[k]["backward_runs"] for k in dict_errors.keys()]
+        seq_loss_backward = [dict_results[k]["backward_runs"] for k in dict_results.keys()]
+        for k in dict_errors.keys():
+            np.save(os.path.join(backward_is_out, "backward_errors_X_{}".format(k)),
+                    dict_errors[k]["backward_runs"].squeeze())
+    else:
+        seq_errors_backward, seq_loss_backward = [], []
+    if args.pms:
+        seq_loss_pms = [dict_results[k]["pms_runs"] for k in dict_results.keys()]
+        seq_errors_pms = [dict_errors[k]["pms_runs"] for k in dict_errors.keys()]
+        for k in dict_errors.keys():
+            np.save(os.path.join(pms_out, "pms_errors_X_{}".format(k)), dict_errors[k]["pms_runs"].squeeze())
+    else:
+        seq_errors_pms, seq_loss_pms = [], []
 
     if args.backward_is and args.pms:
         backward_is_smoother.boxplots_error(errors_backward=seq_errors_backward, errors_pms=seq_errors_pms,
@@ -270,7 +275,7 @@ def run(args):
     plot_variance_square_error(dict_results=dict_results, num_runs=args.runs, out_folder=backward_is_out,
                            num_particles=args.num_particles, backward_samples=args.backward_samples, args=args)
     plot_variance_error(dict_errors=dict_errors, num_runs=args.runs, out_folder=backward_is_out, num_particles=args.num_particles, backward_samples=args.backward_samples, args=args)
-    write_to_csv(output_dir=os.path.join(out_path, "results_{}runs_{}J_{}particles.csv".format(args.runs, args.backward_samples, args.num_particles)), dic=dict_results)
+    write_to_csv(output_dir=os.path.join(out_path, "results_{}runs_{}J_{}particles_{}pms-part.csv".format(args.runs, args.backward_samples, args.num_particles, args.particles_pms)), dic=dict_results)
 
 
 if __name__ == '__main__':
