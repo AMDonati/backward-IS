@@ -32,5 +32,6 @@ PARTICLES_PMS=12000
 
 set -x
 echo "now processing task id:: " ${SLURM_ARRAY_TASK_ID}
-srun python -u src/estimate.py -data_path $DATA_PATH -model_path $MODEL_PATH -out_path ${SLURM_ARRAY_TASK_ID} -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -sigma_init $SIGMA_INIT -sigma_y $SIGMA_Y -sigma_h $SIGMA_H -runs $RUNS -pms $PMS -particles_pms $PARTICLES_PMS
+OUT_PATH=100_runs/${SLURM_ARRAY_TASK_ID}
+srun python -u src/estimate.py -data_path $DATA_PATH -model_path $MODEL_PATH -out_path ${OUT_PATH} -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -sigma_init $SIGMA_INIT -sigma_y $SIGMA_Y -sigma_h $SIGMA_H -runs $RUNS -pms $PMS -particles_pms $PARTICLES_PMS
 exit 0
