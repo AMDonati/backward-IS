@@ -10,6 +10,16 @@ def resample(params, I):
     resampled_params = torch.gather(input=params, index=I, dim=1)
     return resampled_params
 
+def resample_backward(params, I):
+    '''
+        :params: shape (1,P,H)
+        :I: shape (P,J)
+        '''
+    I = I.unsqueeze(-1).repeat(1, 1, params.size(-1))
+    params = params.repeat()
+    resampled_params = torch.gather(input=params, index=I, dim=1)
+    return resampled_params
+
 
 def resample_all_seq(params, i_t):
     '''

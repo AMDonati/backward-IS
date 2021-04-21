@@ -248,7 +248,7 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
         # '''
         # '''update $\tau_k^l from $\tau_{k-1}^l, $w_{k-1]^l, $\xi_{k-1}^Jk$ and from Jk(j), \Tilde(w)(l,j) for all j in 0...backward samples'''
 
-        resampled_tau = resample(self.past_tau, backward_indices)  # (B,backward_samples, hidden_size)
+        resampled_tau = resample(self.past_tau.repeat(backward_indices.size(0), 1, 1), backward_indices)  # (B,backward_samples, hidden_size)
         new_tau_element = IS_weights * (resampled_tau + self.estimation_function(k=k, X=ancestors,
                                                                                  index=self.index_state))  # (B, backward_samples, hidden_size)
         new_tau = new_tau_element.sum(1)
@@ -260,38 +260,31 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
         with torch.no_grad():
             # for loop on time
             for k in range(self.seq_len - 1):
-                #self.logger.info(
-                    #"---------------------------------------------- TIMESTEP {}-------------------------------------------------------".format(
-                        #k))
                 # Run bootstrap filter at time k
                 self.old_filtering_weights = self.filtering_weights
                 self.past_tau = self.new_tau
                 (self.particles, _), self.filtering_weights = self.bootstrap_filter.get_new_particle(
                     observation=self.observations[:, :, k, :], next_observation=self.observations[:, :, k + 1, :],
                     hidden=self.ancestors, weights=self.old_filtering_weights)
+
                 # Backward Simulation
-                # For loop of number of particles
-                new_taus, all_is_weights = [], []
-                for l in range(self.num_particles):
-                    # Select one particle.
-                    particle = self.particles[:, l, :].unsqueeze(dim=1)  # shape (B, 1, hidden)
-                    # A. Get backward Indice J from past filtering weights
-                    backward_indices = torch.multinomial(self.old_filtering_weights,
-                                                         self.backward_samples, replacement=True)  # shape (B, J)
-                    # B. Select Ancestor with J.
-                    ancestors = resample(self.ancestors, backward_indices)  # shape (B, J, hidden) # ok function resample checked.
-                    # C. Compute IS weights with Ancestor & Particle.
-                    is_weights = self.rnn.estimate_transition_density(ancestor=ancestors, particle=particle,
-                                                                      previous_observation=self.observations[:, :, k,
-                                                                                           :])
-                    # End for
-                    # compute $\tau_k^l$ with all backward IS weights, ancestors, current particle & all backward_indices.
-                    new_tau = self.update_tau(ancestors=ancestors, particle=particle, backward_indices=backward_indices,
-                                              IS_weights=is_weights.unsqueeze(-1), k=k)
-                    new_taus.append(new_tau)
-                    all_is_weights.append(is_weights)
+                # A. Get backward Indice J from past filtering weights
+                backward_indices = torch.multinomial(self.old_filtering_weights,
+                                                     self.num_particles * self.backward_samples, replacement=True)
+                backward_indices = backward_indices.view(self.num_particles, self.backward_samples)  # shape (B, J)
+
+                # B. Select Ancestor with J.
+                ancestors = resample(self.ancestors.repeat(backward_indices.size(0), 1, 1),
+                                     backward_indices)  # shape (P, J, hidden) # ok function resample checked.
+                # C. Compute IS weights with Ancestor & Particle.
+                is_weights = self.rnn.estimate_transition_density(ancestor=ancestors, particle=self.particles.squeeze(),
+                                                                  previous_observation=self.observations[:, :, k,
+                                                                                       :]) # shape (B,J)
                 # End for
-                self.new_tau = torch.stack(new_taus, dim=1)  # shape (B, num_particles, hidden_size)
+                # compute $\tau_k^l$ with all backward IS weights, ancestors, current particle & all backward_indices.
+                new_tau = self.update_tau(ancestors=ancestors, particle=self.particles, backward_indices=backward_indices,
+                                          IS_weights=is_weights.unsqueeze(-1), k=k)
+                self.new_tau = new_tau
                 self.ancestors = self.particles
             # End for
             # Compute $\phi_n$ with last filtering weights and last $tau$.
@@ -415,3 +408,28 @@ class PoorManSmoothing(SmoothingAlgo):
         for t in reversed(range(n_times)):
             resampled_trajectories[t, :, :] = trajectories[t, genealogy[t, :], :] # (seq_len, P, hidden_size)
         return np.transpose(resampled_trajectories, axes=[1,0,2])
+
+
+
+# Backward Simulation
+# For loop of number of particles
+# new_taus, all_is_weights = [], []
+# for l in range(self.num_particles):
+#     # Select one particle.
+#     particle = self.particles[:, l, :].unsqueeze(dim=1)  # shape (B, 1, hidden)
+#     # A. Get backward Indice J from past filtering weights
+#     backward_indices = torch.multinomial(self.old_filtering_weights,
+#                                          self.backward_samples, replacement=True)  # shape (B, J)
+#     # B. Select Ancestor with J.
+#     ancestors = resample(self.ancestors, backward_indices)  # shape (B, J, hidden) # ok function resample checked.
+#     # C. Compute IS weights with Ancestor & Particle.
+#     is_weights = self.rnn.estimate_transition_density(ancestor=ancestors, particle=particle,
+#                                                       previous_observation=self.observations[:, :, k,
+#                                                                            :])
+#     # End for
+#     # compute $\tau_k^l$ with all backward IS weights, ancestors, current particle & all backward_indices.
+#     new_tau = self.update_tau(ancestors=ancestors, particle=particle, backward_indices=backward_indices,
+#                               IS_weights=is_weights.unsqueeze(-1), k=k)
+#     new_taus.append(new_tau)
+#     all_is_weights.append(is_weights)
+# # End for

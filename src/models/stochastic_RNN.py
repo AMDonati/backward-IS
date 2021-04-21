@@ -101,9 +101,6 @@ class OneLayerRNN(nn.Module):
         '''
         distrib = torch.distributions.multivariate_normal.MultivariateNormal(loc=mean, covariance_matrix=covariance * torch.eye(mean.size(-1)))
         log_d = distrib.log_prob(X)
-        #mu = X - mean   # (B,P,H)
-        #density = (-1 / (2 * covariance)) * torch.matmul(mu, mu.permute(0, 2, 1)) # (B,P,P)
-        #density = torch.diagonal(density, dim1=-2, dim2=-1)  # take the diagonal. # (B,P).
         return log_d
 
     def estimate_transition_density(self, particle, ancestor, previous_observation):
@@ -114,15 +111,15 @@ class OneLayerRNN(nn.Module):
             #:param previous observation $Y_{k}^J$: shape (B, 1, input_size)
         #'''
         # compute mean of gaussian density function from ancestor: $\mu = W_1 * ancestor + W_2 * prev_observation + b$
-        previous_observation = previous_observation.repeat(1, ancestor.size(1), 1)
+        previous_observation = previous_observation.repeat(ancestor.size(0), ancestor.size(1), 1)
         _, activation = self.rnn_cell(input=previous_observation, hidden=ancestor) # shape (B, J, hidden_size)
         # compute gaussian density of arctanh(new_particle)
-        log_density = self.log_gaussian_density_function(X=torch.atanh(particle), mean=activation, covariance=self.rnn_cell.sigma_h)
+        log_density = self.log_gaussian_density_function(X=torch.atanh(particle).unsqueeze(1), mean=activation, covariance=self.rnn_cell.sigma_h)
         # compute prods of 1 / derive_tanh(inv_tanh(new_particle))
         transform = (1-torch.pow(particle, 2)) # (1-z^2) element-wise. (B, 1, hidden)
         log_inv_transform = torch.pow(transform, -1).log() # 1 / (1-z^2) element-wise.
         sum = log_inv_transform.sum(dim=-1) # (B,1) # sum_{i} 1 / (1-z_i^2)
-        log_w = log_density + sum # (B,P)
+        log_w = log_density + sum.unsqueeze(-1) # (B,J)
         # normalize weights with a softmax.
         w = F.softmax(log_w, dim=-1)
         return w
