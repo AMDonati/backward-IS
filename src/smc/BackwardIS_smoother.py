@@ -45,7 +45,6 @@ class SmoothingAlgo:
             mean=torch.zeros(self.states.size(0), self.num_particles, self.states.size(-1)),
             std=sigma_init ** (1 / 2) * torch.ones(self.states.size(0), self.num_particles,
                                                    self.states.size(-1)))
-        # self.ancestors = self.states[:, :, 0, :].repeat(1, self.num_particles, 1)  # (B, num_particles, hidden_size)
         self.trajectories = self.ancestors.unsqueeze(-2)
         self.filtering_weights = self.bootstrap_filter.compute_filtering_weights(hidden=self.ancestors,
                                                                                  observations=self.observations[:,
@@ -217,7 +216,7 @@ class SmoothingAlgo:
         criterion = nn.MSELoss(reduction='none')
         error = phi - self.states[:, :, self.index_state, :].mean(dim=1) # hidden_size
         loss = criterion(phi, self.states[:, :, self.index_state, :].mean(dim=1))
-        return loss.mean(), error
+        return loss.mean().item(), error
 
 
 class RNNBackwardISSmoothing(SmoothingAlgo):
@@ -252,11 +251,13 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
         new_tau_element = IS_weights * (resampled_tau + self.estimation_function(k=k, X=ancestors,
                                                                                  index=self.index_state))  # (B, backward_samples, hidden_size)
         new_tau = new_tau_element.sum(1)
+        #print("NEW TAU", new_tau[:, 0])
         return new_tau
 
     def estimate_conditional_expectation_of_function(self):
         start_time = time.time()
         self.init_particles()
+        mses, errors = [], []
         with torch.no_grad():
             # for loop on time
             for k in range(self.seq_len - 1):
@@ -286,13 +287,16 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
                                           IS_weights=is_weights.unsqueeze(-1), k=k)
                 self.new_tau = new_tau
                 self.ancestors = self.particles
-            # End for
-            # Compute $\phi_n$ with last filtering weights and last $tau$.
-            phi_element = self.filtering_weights.unsqueeze(-1) * self.new_tau
-            phi = phi_element.sum(1)  # shape (B, hidden_size)
+                self.taus.append(self.new_tau)
+                # Compute online estimation: $\mathbb[E][X_k|Y_{0:j}]$
+                phi_element = self.filtering_weights.unsqueeze(-1) * self.new_tau
+                phi = phi_element.sum(1)  # shape (B, hidden_size)
+                mse, error = self.compute_mse_phi_X0(phi)
+                mses.append(mse)
+                errors.append(error)
         total_time = time.time() - start_time
         self.logger.info("TIME FOR ONE BACKWARD IS - num particles {} - backward samples {}- seq len {}: {}".format(self.num_particles, self.backward_samples, self.seq_len, total_time))
-        return phi, (self.new_tau, self.filtering_weights)
+        return (mses, errors), phi, (self.new_tau, self.filtering_weights)
 
     def debug_elements(self, data_path):
         if len(self.taus) > 0:
@@ -352,6 +356,7 @@ class PoorManSmoothing(SmoothingAlgo):
         with torch.no_grad():
             # for loop on time
             indices_matrix, particles_seq = [], []
+            mses, errors = [], []
             particles_seq.append(self.ancestors)
             for k in range(self.seq_len - 1):
                 # Selection: resample all past trajectories with current indice i_t
@@ -367,16 +372,20 @@ class PoorManSmoothing(SmoothingAlgo):
                 particles_seq.append(self.particles)
                 # append resampled trajectories to new particle
                 self.trajectories = torch.cat([resampled_trajectories, self.particles.unsqueeze(-2)], dim=-2)
+                # get mse, error for online estimation:
+                error, mse, phi = self.get_error(k)
+                errors.append(error)
+                mses.append(mse)
             indices_matrix = torch.stack(indices_matrix, dim=0) # (seq_len, P)
             particles_seq = torch.stack(particles_seq, dim=0)
             total_time = time.time() - start_time
             self.logger.info("PMS TIME - {} particles - {} seq len: {}".format(self.num_particles, self.seq_len, total_time))
-            return indices_matrix.numpy(), particles_seq.squeeze().numpy()
+            return (mses, errors), phi, (indices_matrix.numpy(), particles_seq.squeeze().numpy())
 
-    def get_error(self):
+    def get_error(self, k):
         estimation = self.trajectories * self.filtering_weights.view(self.filtering_weights.shape[0], self.filtering_weights.shape[1],1,1) # element-wise multiplication of resampled trajectories and w_n (last filtering weights)
         estimation = estimation.sum(1) # (B,S,hidden_size) # weighted sum.
-        error = estimation - self.states.squeeze(1)
+        error = estimation - self.states.squeeze(1)[:,:k+2,:]
         mse = np.square(error.numpy()).mean(-1) # shape (B,S) # square of error and mean over last dim (all dimensions of the hidden states).
         return error.squeeze(), mse.squeeze(), estimation.squeeze()
 
@@ -408,28 +417,3 @@ class PoorManSmoothing(SmoothingAlgo):
         for t in reversed(range(n_times)):
             resampled_trajectories[t, :, :] = trajectories[t, genealogy[t, :], :] # (seq_len, P, hidden_size)
         return np.transpose(resampled_trajectories, axes=[1,0,2])
-
-
-
-# Backward Simulation
-# For loop of number of particles
-# new_taus, all_is_weights = [], []
-# for l in range(self.num_particles):
-#     # Select one particle.
-#     particle = self.particles[:, l, :].unsqueeze(dim=1)  # shape (B, 1, hidden)
-#     # A. Get backward Indice J from past filtering weights
-#     backward_indices = torch.multinomial(self.old_filtering_weights,
-#                                          self.backward_samples, replacement=True)  # shape (B, J)
-#     # B. Select Ancestor with J.
-#     ancestors = resample(self.ancestors, backward_indices)  # shape (B, J, hidden) # ok function resample checked.
-#     # C. Compute IS weights with Ancestor & Particle.
-#     is_weights = self.rnn.estimate_transition_density(ancestor=ancestors, particle=particle,
-#                                                       previous_observation=self.observations[:, :, k,
-#                                                                            :])
-#     # End for
-#     # compute $\tau_k^l$ with all backward IS weights, ancestors, current particle & all backward_indices.
-#     new_tau = self.update_tau(ancestors=ancestors, particle=particle, backward_indices=backward_indices,
-#                               IS_weights=is_weights.unsqueeze(-1), k=k)
-#     new_taus.append(new_tau)
-#     all_is_weights.append(is_weights)
-# # End for
