@@ -91,7 +91,6 @@ def run(args):
 
         for index_state in index_states:
             # Create the Backward IS Smoother
-            results_backward, errors_backward, phis_backward = [], [], []
             backward_is_smoother = RNNBackwardISSmoothing(bootstrap_filter=rnn_bootstrap_filter,
                                                           observations=observations,
                                                           states=states, backward_samples=args.backward_samples,
@@ -143,48 +142,24 @@ def run(args):
         poor_man_smoother.logger.info(
             "-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
 
-        #np.save(os.path.join(pms_out, "phis_pms.npy"), phis_pms[index_states].cpu().squeeze().numpy())
         for index in index_states:
             res_pms = [r[index] for r in mses_pms]
             err_pms = [e[index] for e in errors_pms]
             dict_results = fill_dict_pms(dict=dict_results, index_state=index, results_pms=res_pms)
             dict_errors = fill_dict_pms(dict=dict_errors, index_state=index, results_pms=err_pms,
                                              stack=True)
-
-        particles_pms = poor_man_smoother.trajectories[:,:,index_states,:]
+            np.save(os.path.join(pms_out, "phis_pms_X_{}.npy".format(index)), phi_pms[index].cpu().squeeze().numpy())
 
     if args.backward_is:
-        seq_errors_backward = [dict_errors[k]["backward_by_seq"] for k in dict_errors.keys()]
-        seq_loss_backward = [dict_results[k]["backward_by_seq"] for k in dict_results.keys()]
         for k in dict_errors.keys():
             np.save(os.path.join(backward_is_out, "backward_errors_X_{}".format(k)),
                     dict_errors[k]["backward_by_seq"].squeeze())
-    else:
-        seq_errors_backward, seq_loss_backward = [], []
     if args.pms:
-        seq_loss_pms = [dict_results[k]["pms_by_seq"] for k in dict_results.keys()]
-        seq_errors_pms = [dict_errors[k]["pms_by_seq"] for k in dict_errors.keys()]
         for k in dict_errors.keys():
             np.save(os.path.join(pms_out, "pms_errors_X_{}".format(k)), dict_errors[k]["pms_by_seq"].squeeze())
-    else:
-        seq_errors_pms, seq_loss_pms = [], []
 
-    if args.backward_is and args.pms:
-        backward_is_smoother.boxplots_error(errors_backward=seq_errors_backward, errors_pms=seq_errors_pms,
-                                            out_folder=backward_is_out, num_runs=args.runs, index_states=index_states)
-        backward_is_smoother.boxplots_loss(loss_backward=seq_loss_backward, loss_pms=seq_loss_pms,
-                                            out_folder=backward_is_out, num_runs=args.runs, index_states=index_states)
-        backward_is_smoother.plot_particles_all_k(particles_backward=particles_backward, weights_backward=weights_backward,
-                                                  particles_pms=particles_pms, weights_pms=poor_man_smoother.filtering_weights,
-                                                  out_folder=backward_is_out, num_runs=args.runs, index_states=index_states)
-
-
-    plot_mean_square_error(dict_results=dict_results, num_runs=args.runs, out_folder=backward_is_out, num_particles=args.num_particles, backward_samples=args.backward_samples, args=args)
-    plot_variance_square_error(dict_results=dict_results, num_runs=args.runs, out_folder=backward_is_out,
-                           num_particles=args.num_particles, backward_samples=args.backward_samples, args=args)
-    plot_variance_error(dict_errors=dict_errors, num_runs=args.runs, out_folder=backward_is_out, num_particles=args.num_particles, backward_samples=args.backward_samples, args=args)
-    write_to_csv(output_dir=os.path.join(out_path, "results_{}runs_{}J_{}particles_{}pms-part.csv".format(args.runs, args.backward_samples, args.num_particles, args.particles_pms)), dic=dict_results)
-
+    write_to_csv(output_dir=os.path.join(out_path, "results.csv"), dic=dict_results)
+    write_to_csv(output_dir=os.path.join(out_path, "errors.csv"), dic=dict_results)
 
 if __name__ == '__main__':
     parser = get_parser()
