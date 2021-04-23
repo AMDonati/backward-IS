@@ -51,10 +51,18 @@ mean_pms_seq_mean = mean_pms_seq_mean / len(dirs)
 pms_all_k = final_df.iloc[0, :-1]
 backward_all_k = final_df.iloc[1, :-1]
 
-
 out_folder = os.path.join(folder_path, "aggregated_results")
 if not os.path.isdir(out_folder):
     os.makedirs(out_folder)
+np.save(os.path.join(out_folder,"mse_backward_seq_0.npy"), mean_backward_seq_0)
+pd.DataFrame(mean_backward_seq_0).to_csv(os.path.join(out_folder,"mse_backward_seq_0.csv"))
+np.save(os.path.join(out_folder,"mse_backward_seq_mean.npy"), mean_backward_seq_mean)
+pd.DataFrame(mean_backward_seq_mean).to_csv(os.path.join(out_folder,"mse_backward_seq_mean.csv"))
+np.save(os.path.join(out_folder,"mse_pms_seq_0.npy"), mean_pms_seq_0)
+pd.DataFrame(mean_pms_seq_0).to_csv(os.path.join(out_folder,"mse_pms_seq_0.csv"))
+np.save(os.path.join(out_folder,"mse_pms_seq_mean.npy"), mean_pms_seq_mean)
+pd.DataFrame(mean_pms_seq_mean).to_csv(os.path.join(out_folder,"mse_pms_seq_mean.csv"))
+
 plot_online_estimation_mse_aggregated(pms_by_seq=mean_pms_seq_0, backward_by_seq=mean_backward_seq_0, out_folder=out_folder)
 plot_estimation_Xk(pms_all_k=pms_all_k.values, backward_all_k=backward_all_k.values, out_folder=out_folder)
 
