@@ -79,3 +79,58 @@ def plot_variance_square_error(dict_results, num_runs, out_folder, num_particles
     ax.set_title('variance of the squared error', fontsize=20)
     fig.savefig(os.path.join(out_folder, out_file))
     plt.close()
+
+def plot_online_estimation_mse(dict_results, out_folder, args):
+    if args.backward_is:
+        backward_is = dict_results[0]["backward_by_seq"]
+    if args.pms:
+        pms = dict_results[0]["pms_by_seq"]
+    fig, ax = plt.subplots(figsize=(30, 10))
+    len_ = len(pms) if args.pms else len(backward_is)
+    xx = np.linspace(1, len_, len_)
+    if args.backward_is:
+        ax.plot(xx, backward_is, color='blue', marker='x', label='backward IS smoother')
+    if args.pms:
+        ax.plot(xx, pms, color='red', marker='x', label='PMS smoother')
+    labels = ['Y0:{}'.format(k) for k in range(1,len_+1)]
+    plt.xticks(ticks=xx, labels=labels)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels)
+    out_file = "online_estimation_mse.pdf"
+    ax.grid('on')
+    ax.set_title(r'$\|X_0 - \mathbb{E}[X_0|Y_{0:j}]\|^2$ per sequence of observations $(Y_{0:j})_{1 \leq j \leq n}$', fontsize=20)
+    fig.savefig(os.path.join(out_folder, out_file), format='pdf')
+    plt.close()
+
+def plot_online_estimation_mse_aggregated(pms_by_seq, backward_by_seq, out_folder):
+    fig, ax = plt.subplots(figsize=(30, 10))
+    xx = np.linspace(1, len(pms_by_seq), len(pms_by_seq))
+    ax.plot(xx, backward_by_seq, color='tab:cyan', marker='x', label='backward IS smoother', lw=2)
+    ax.plot(xx, pms_by_seq, color='salmon', marker='x', label='PMS smoother', lw=2)
+    labels = ['Y0:{}'.format(k) for k in range(1,len(pms_by_seq)+1)]
+    plt.xticks(ticks=xx, labels=labels, fontsize=16)
+    ax.tick_params(axis="y", labelsize=16)
+    out_file = "online_estimation_mse.pdf"
+    ax.grid(True,ls='--',lw =.5,c='k',alpha=.3)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels, fontsize=16)
+    ax.set_title(r'$\|X_0 - \mathbb{E}[X_0|Y_{0:j}]\|^2$ per sequence of observations $(Y_{0:j})_{1 \leq j \leq n}$', fontsize=20)
+    fig.savefig(os.path.join(out_folder, out_file), format='pdf')
+    plt.close()
+
+def plot_estimation_Xk(backward_all_k, pms_all_k, out_folder):
+    fig, ax = plt.subplots(figsize=(30, 10))
+    xx = np.linspace(1, len(backward_all_k), len(backward_all_k))
+    ax.plot(xx, backward_all_k, color='tab:cyan', marker='x', label='backward IS smoother', lw=2)
+    ax.plot(xx, pms_all_k, color='salmon', marker='x', label='PMS smoother', lw=2)
+    labels = ['X_{}'.format(k) for k in range(0, len(pms_all_k))]
+    plt.xticks(ticks=xx, labels=labels, fontsize=16)
+    ax.tick_params(axis="y", labelsize=16)
+    out_file = "mse_all_Xk.pdf"
+    ax.grid(True, ls='--', lw=.5, c='k', alpha=.3)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels, fontsize=20)
+    ax.set_title(r'$\|X_k - \mathbb{E}[X_k|Y_{0:n}]\|^2$ for k $\in \{0,...,n\}$',
+                 fontsize=20)
+    fig.savefig(os.path.join(out_folder, out_file), format='pdf')
+    plt.close()

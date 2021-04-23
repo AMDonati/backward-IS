@@ -40,7 +40,6 @@ class RNNBootstrapFilter:
             # Mutation: compute $I_t$ from $w_{t-1}$ and resample $h_{t-1}$ = \xi_{t-1}^l
             It = torch.multinomial(weights, num_samples=self.num_particles, replacement=True)
             resampled_h = resample(hidden, It)
-            #print("BACKWARD IS Filtering indices", It.cpu().squeeze().numpy())
         else:
             resampled_h = hidden
         # Selection : get $h_t$ = \xi_t^l

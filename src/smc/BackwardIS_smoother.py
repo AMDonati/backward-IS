@@ -257,7 +257,7 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
     def estimate_conditional_expectation_of_function(self):
         start_time = time.time()
         self.init_particles()
-        mses, errors = [], []
+        mses, errors, phis = [], [], []
         with torch.no_grad():
             # for loop on time
             for k in range(self.seq_len - 1):
@@ -294,9 +294,10 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
                 mse, error = self.compute_mse_phi_X0(phi)
                 mses.append(mse)
                 errors.append(error)
+                phis.append(phi)
         total_time = time.time() - start_time
         self.logger.info("TIME FOR ONE BACKWARD IS - num particles {} - backward samples {}- seq len {}: {}".format(self.num_particles, self.backward_samples, self.seq_len, total_time))
-        return (mses, errors), phi, (self.new_tau, self.filtering_weights)
+        return (mses, errors), phis, (self.new_tau, self.filtering_weights)
 
     def debug_elements(self, data_path):
         if len(self.taus) > 0:
@@ -356,7 +357,7 @@ class PoorManSmoothing(SmoothingAlgo):
         with torch.no_grad():
             # for loop on time
             indices_matrix, particles_seq = [], []
-            mses, errors = [], []
+            mses, errors, phis = [], [], []
             particles_seq.append(self.ancestors)
             for k in range(self.seq_len - 1):
                 # Selection: resample all past trajectories with current indice i_t
@@ -376,11 +377,12 @@ class PoorManSmoothing(SmoothingAlgo):
                 error, mse, phi = self.get_error(k)
                 errors.append(error)
                 mses.append(mse)
+                phis.append(phi)
             indices_matrix = torch.stack(indices_matrix, dim=0) # (seq_len, P)
             particles_seq = torch.stack(particles_seq, dim=0)
             total_time = time.time() - start_time
             self.logger.info("PMS TIME - {} particles - {} seq len: {}".format(self.num_particles, self.seq_len, total_time))
-            return (mses, errors), phi, (indices_matrix.numpy(), particles_seq.squeeze().numpy())
+            return (mses, errors), phis, (indices_matrix.numpy(), particles_seq.squeeze().numpy())
 
     def get_error(self, k):
         estimation = self.trajectories * self.filtering_weights.view(self.filtering_weights.shape[0], self.filtering_weights.shape[1],1,1) # element-wise multiplication of resampled trajectories and w_n (last filtering weights)
