@@ -6,13 +6,12 @@ from smc.plots import plot_online_estimation_mse_aggregated, plot_estimation_Xk
 parser = argparse.ArgumentParser()
 # data parameters:
 parser.add_argument("-folder_path", type=str,
-                    default="",
+                    required=True,
                     help="path for uploading the results")
 
 args = parser.parse_args()
 
 folder_path = args.folder_path
-folder_path = "../../output/RNN_weather/RNN_h32_ep15_bs64_maxsamples20000/seq_len25"
 
 dirs = [f.path for f in os.scandir(folder_path) if f.is_dir()]
 
