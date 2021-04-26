@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=H64-S100
-#SBATCH --qos=qos_gpu-t4
+#SBATCH --job-name=TEST-H64-S200
+#SBATCH --qos=qos_gpu-t3
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=8g
-#SBATCH --output=slurm_out_2/h64-S100-%j.out
-#SBATCH --error=slurm_out_2/h64-S100-%j.err
-#SBATCH --time=50:00:00
+#SBATCH --output=slurm_out_2/TEST-h64-S200-%j.out
+#SBATCH --error=slurm_out_2/TEST-h64-S200-%j.err
+#SBATCH --time=5:00:00
 
 
 export TMPDIR=$JOBSCRATCH
