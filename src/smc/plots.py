@@ -121,16 +121,17 @@ def plot_online_estimation_mse_aggregated(pms_by_seq, backward_by_seq, out_folde
 def plot_estimation_Xk(backward_all_k, pms_all_k, out_folder):
     fig, ax = plt.subplots(figsize=(30, 10))
     xx = np.linspace(1, len(backward_all_k), len(backward_all_k))
-    ax.plot(xx, backward_all_k, color='tab:cyan', marker='x', label='backward IS smoother', lw=2)
+    ax.plot(xx, backward_all_k, color='tab:cyan', marker='o', label='backward IS smoother', lw=2)
     ax.plot(xx, pms_all_k, color='salmon', marker='x', label='PMS smoother', lw=2)
     labels = ['X_{}'.format(k) for k in range(0, len(pms_all_k))]
     #plt.xticks(ticks=xx, labels=labels, fontsize=16)
-    ax.tick_params(axis="y", labelsize=16)
+    #ax.tick_params(axis="y", labelsize=20)
+    ax.tick_params(labelsize=30)
     out_file = "mse_all_Xk.pdf"
     ax.grid(True, ls='--', lw=.5, c='k', alpha=.3, axis='y')
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles, labels, fontsize=20)
-    ax.set_title(r'$\|X_k - \mathbb{E}[X_k|Y_{0:200}]\|^2$ for k $\in \{0,...,200\}$',
-                 fontsize=20)
+    ax.legend(handles, labels, fontsize=30)
+    #ax.set_title(r'$\|X_k - \mathbb{E}[X_k|Y_{0:200}]\|^2$ for k $\in \{0,...,200\}$',
+                 #fontsize=20)
     fig.savefig(os.path.join(out_folder, out_file), format='pdf')
     plt.close()
