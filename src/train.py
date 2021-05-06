@@ -7,7 +7,7 @@ def get_parser():
     # data parameters:
     parser.add_argument("-dataset", type=str, default='weather', help='dataset selection')
     parser.add_argument("-data_path", type=str, default='data/weather', help="path for uploading the dataset")
-    parser.add_argument("-max_samples", type=int, default=50000, help="max samples for train dataset")
+    parser.add_argument("-max_samples", type=int, default=20000, help="max samples for train dataset")
     # model parameters:
     parser.add_argument("-num_layers", type=int, default=1, help="number of layers in the network")
     parser.add_argument("-hidden_size", type=int, default=32, help="number of rnn units")
@@ -19,10 +19,10 @@ def get_parser():
     parser.add_argument("-output_path", type=str, required=True, help="path for output folder")
     parser.add_argument("-save_path", type=str, help="path for saved model folder (if load checkpoint)")
     # generate arguments
-    parser.add_argument("-bs_test", type=int, help="batch size for generating observations")
-    parser.add_argument("-data_samples", type=int, default=3000, help="number of data samples in the test dataset to generate observations on.")
+    parser.add_argument("-bs_test", type=int, default=1, help="batch size for generating observations")
+    parser.add_argument("-data_samples", type=int, default=1, help="number of data samples in the test dataset to generate observations on.")
     parser.add_argument("-shuffle_test", type=int, default=0, help="index shuffling for input data in observations generation")
-    parser.add_argument("-seq_len", type=int, default=24,
+    parser.add_argument("-seq_len", type=int, default=201,
                         help="number of observations in the sequence of observations to generate.")
     parser.add_argument("-sigma_init", type=float,
                         help="covariance matrix for initial hidden state")
