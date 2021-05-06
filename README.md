@@ -1,6 +1,6 @@
 # backward-IS
 
-This github repository provides the source code for the section 5.1 (Recurrent Neural Networks) of the paper "Backward importance sampling for online estimation of state space models". 
+The github repository (https://github.com/AMDonati/backward-IS) provides the source code for the section 5.1 (Recurrent Neural Networks) of the paper "Backward importance sampling for online estimation of state space models". 
 
 ### package requirements 
 The packages required to run the code are provided in the file ```requirements.txt```.  
