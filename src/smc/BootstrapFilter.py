@@ -58,7 +58,7 @@ class SVBootstrapFilter:
     def update_SV_params(self, params):
         self.params = params
 
-    def compute_filtering_weights(self, particle, observation):
+    def compute_filtering_weights(self, particle, observation, params):
         '''
              # FORMULA
              # logw = -0.5 * mu_t ^ T * mu_t / sigma; sigma=scalar covariance.
@@ -71,19 +71,19 @@ class SVBootstrapFilter:
         # get current prediction from hidden state.
         observation = observation.unsqueeze(-1)
         covariance_diag = torch.exp(particle).unsqueeze(-1) # shape (P,1,1)
-        log_w = log_gaussian_density_function(X=observation, mean=torch.zeros(size=observation.size()), covariance=self.params[2]**2 * covariance_diag)  # shape (P)
+        log_w = log_gaussian_density_function(X=observation, mean=torch.zeros(size=observation.size()), covariance=params[2]**2 * covariance_diag)  # shape (P)
         #log_w2 = manual_log_density_function(X=observation, mean=torch.zeros(size=observation.size()), covariance=self.params[2]**2 * covariance_diag)
         w = F.softmax(log_w, dim=-1)
         return w
 
-    def compute_IS_weights(self, resampled_ancestors, particle, backward_samples):
+    def compute_IS_weights(self, resampled_ancestors, particle, backward_samples, params):
         particle = particle.unsqueeze(1).repeat((1, backward_samples,1)) # shape (particles, backward_samples, 1)
-        log_w = log_gaussian_density_function(X=particle, mean=self.params[0]*resampled_ancestors, covariance=self.params[1])
+        log_w = log_gaussian_density_function(X=particle, mean=params[0]*resampled_ancestors, covariance=params[1])
         #log_w2 = manual_log_density_function(X=particle, mean=self.params[0]*resampled_ancestors, covariance=self.params[1] * torch.eye(1))
         w = F.softmax(log_w, dim=-1)
         return w
 
-    def get_new_particle(self, next_observation, ancestor, weights, resampling=True):
+    def get_new_particle(self, next_observation, ancestor, weights, params, resampling=True):
         #'''
         #:param next_observation $Y_{k+1}$: tensor of shape (B, P, input_size)
         #:param ancestor \xi_k:  tensor of shape (B, P, hidden_size)
@@ -97,7 +97,7 @@ class SVBootstrapFilter:
         else:
             resampled_ancestor = ancestor
         # Selection : get $h_t$ = \xi_t^l
-        particle = self.params[0] * resampled_ancestor + self.params[1] * torch.normal(mean=ancestor.new_zeros(ancestor.size()), std=ancestor.new_ones(ancestor.size()))
+        particle = params[0] * resampled_ancestor + params[1] * torch.normal(mean=ancestor.new_zeros(ancestor.size()), std=ancestor.new_ones(ancestor.size()))
         # compute $w_t$
-        new_weights = self.compute_filtering_weights(particle=particle, observation=next_observation)
+        new_weights = self.compute_filtering_weights(particle=particle, observation=next_observation, params=params)
         return particle, new_weights

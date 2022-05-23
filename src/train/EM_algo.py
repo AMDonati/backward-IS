@@ -2,12 +2,14 @@ import numpy as np
 import torch
 from smc.BootstrapFilter import SVBootstrapFilter
 from smc.BackwardIS_smoother import SVBackwardISSmoothing
+import scipy.optimize as opt
 
 if __name__ == '__main__':
     # hparams
     num_particles = 10
     backward_samples = 4
     init_params = [0.1, 0.2, 0.3]
+    n_iter = 10
 
     # upload dataset
     observations = np.array([0.01*i for i in range(12)])
@@ -24,10 +26,18 @@ if __name__ == '__main__':
     # create SVBackward IS smoothing with number of backward samples, out_folder, logger.
     smoother = SVBackwardISSmoothing(backward_samples=backward_samples, observations=observations, bootstrap_filter=bt_filter)
 
-    phis, (last_tau, last_filtering_weights) = smoother.estimate_conditional_expectation_of_function()
+    print("INIT PARAMS: {}".format(init_params))
+    for iter in range(n_iter):
 
-    expectation = (last_tau.squeeze()*last_filtering_weights).sum().numpy()
+        expectation = smoother.estimate_conditional_expectation_of_function(bt_filter.params)
+        print("negative log-likelihood at iter {}: {}".format(iter, expectation))
 
+        results = opt.minimize(fun=smoother.estimate_conditional_expectation_of_function, x0=bt_filter.params)
+
+        print("new params: {}".format(results.x))
+        bt_filter.update_SV_params(results.x)
+
+        print("-"*30)
 
     print("done")
 
