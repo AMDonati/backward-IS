@@ -1,6 +1,7 @@
-from smc.utils import resample
+from smc.utils import resample, resample_1D, log_gaussian_density_function, manual_log_density_function
 import torch
 import torch.nn.functional as F
+import numpy as np
 
 class RNNBootstrapFilter:
     def __init__(self, num_particles, rnn):
@@ -48,3 +49,55 @@ class RNNBootstrapFilter:
         # compute $w_t$
         new_weights = self.compute_filtering_weights(hidden=new_hidden, observations=next_observation)
         return (new_hidden, resampled_h), new_weights
+
+class SVBootstrapFilter:
+    def __init__(self, num_particles, init_params):
+        self.num_particles = num_particles
+        self.params = init_params
+
+    def update_SV_params(self, params):
+        self.params = params
+
+    def compute_filtering_weights(self, particle, observation):
+        '''
+             # FORMULA
+             # logw = -0.5 * mu_t ^ T * mu_t / sigma; sigma=scalar covariance.
+             #  w = softmax(log_w)
+             :param hidden: hidden state at timestep k: tensor of shape (B,num_particles,1,hidden_size)
+             :param observations: current target element > shape (B,num_particles,1,F_y).
+             :return:
+             resampling weights of shape (B,P=num_particles).
+        '''
+        # get current prediction from hidden state.
+        observation = observation.unsqueeze(-1)
+        covariance_diag = torch.exp(particle).unsqueeze(-1) # shape (P,1,1)
+        log_w = log_gaussian_density_function(X=observation, mean=torch.zeros(size=observation.size()), covariance=self.params[2]**2 * covariance_diag)  # shape (P)
+        #log_w2 = manual_log_density_function(X=observation, mean=torch.zeros(size=observation.size()), covariance=self.params[2]**2 * covariance_diag)
+        w = F.softmax(log_w, dim=-1)
+        return w
+
+    def compute_IS_weights(self, resampled_ancestors, particle, backward_samples):
+        particle = particle.unsqueeze(1).repeat((1, backward_samples,1)) # shape (particles, backward_samples, 1)
+        log_w = log_gaussian_density_function(X=particle, mean=self.params[0]*resampled_ancestors, covariance=self.params[1])
+        #log_w2 = manual_log_density_function(X=particle, mean=self.params[0]*resampled_ancestors, covariance=self.params[1] * torch.eye(1))
+        w = F.softmax(log_w, dim=-1)
+        return w
+
+    def get_new_particle(self, next_observation, ancestor, weights, resampling=True):
+        #'''
+        #:param next_observation $Y_{k+1}$: tensor of shape (B, P, input_size)
+        #:param ancestor \xi_k:  tensor of shape (B, P, hidden_size)
+        #:param $\w_{k}^l$: previous resampling weights: tensor of shape (B, P)
+        #:return new_hidden state $\xi_{k+1}^l$: tensor of shape (B, P, hidden_size), new_weights $w_{k+1}^l$: shape (B,P).
+        #'''
+        if resampling:
+            # Mutation: compute $I_t$ from $w_{t-1}$ and resample $h_{t-1}$ = \xi_{t-1}^l
+            It = torch.multinomial(weights, num_samples=self.num_particles, replacement=True)
+            resampled_ancestor = resample_1D(ancestor, It) # OK function resample works. # shape (P,1)
+        else:
+            resampled_ancestor = ancestor
+        # Selection : get $h_t$ = \xi_t^l
+        particle = self.params[0] * resampled_ancestor + self.params[1] * torch.normal(mean=ancestor.new_zeros(ancestor.size()), std=ancestor.new_ones(ancestor.size()))
+        # compute $w_t$
+        new_weights = self.compute_filtering_weights(particle=particle, observation=next_observation)
+        return particle, new_weights

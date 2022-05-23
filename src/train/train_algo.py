@@ -112,7 +112,7 @@ class RNNAlgo:
                 datapoints, labels = datapoints.to(self.device), labels.to(self.device)
                 self.optimizer.zero_grad()
                 preds, _ = self.rnn(datapoints)  # (B,S,P,D)
-                loss = self.criterion(preds, labels)
+                loss = self.criterion(preds, labels) #TODO: compute loss in another way here using the BackwardISSmoother.
                 train_loss += loss
                 loss.backward()
                 self.optimizer.step()
