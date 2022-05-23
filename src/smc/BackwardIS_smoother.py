@@ -413,7 +413,7 @@ class SVBackwardISSmoothing(SmoothingAlgo):
 
     def estimate_conditional_expectation_of_function(self, params):
         start_time = time.time()
-        self.init_particles(params)
+        self.init_particles(self.bootstrap_filter.params)
         phis = []
         with torch.no_grad():
             # for loop on time
@@ -424,7 +424,7 @@ class SVBackwardISSmoothing(SmoothingAlgo):
                 self.particles, self.filtering_weights = self.bootstrap_filter.get_new_particle(
                     next_observation=self.observations[:, k + 1],
                     ancestor=self.ancestors, weights=self.old_filtering_weights,
-                    params=params)  # should depend on self.observations[:,k]! No OK, particle = \xi_{k+1}, ancestors = \xi_k
+                    params=self.bootstrap_filter.params)  # should depend on self.observations[:,k]! No OK, particle = \xi_{k+1}, ancestors = \xi_k
 
                 # Backward Simulation
                 # A. Get backward Indice J_{k+1} from past filtering weights w_k
@@ -439,7 +439,7 @@ class SVBackwardISSmoothing(SmoothingAlgo):
                 is_weights = self.bootstrap_filter.compute_IS_weights(resampled_ancestors=ancestors,
                                                                       particle=self.particles,
                                                                       backward_samples=self.backward_samples,
-                                                                      params=params)
+                                                                      params=self.bootstrap_filter.params)
 
                 # compute $\tau_{k+1}$ with all backward IS weights \bar{\omega}_k,  resampled ancestors \xi_k^{J_{k+1}}, current particle  \xi_{k+1} & all backward_indices J_{k+1}.
                 new_tau = self.update_tau(ancestors=ancestors, particle=self.particles,
