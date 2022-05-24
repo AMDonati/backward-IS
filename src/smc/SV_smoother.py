@@ -130,12 +130,12 @@ class SVBackwardISSmoothing(SmoothingAlgo):
         self.init_particles(self.bootstrap_filter.params)
         with torch.no_grad():
             # for loop on time
-            for k in range(self.seq_len - 1):
+            for k in range(self.seq_len):
                 # Run bootstrap filter at time k
                 self.old_filtering_weights = self.filtering_weights  # w_k. # shape (P)
                 self.past_tau = self.new_tau # shape (P,1)
                 self.particles, self.filtering_weights = self.bootstrap_filter.get_new_particle(
-                    next_observation=self.observations[:, k + 1],
+                    next_observation=self.observations[:, k],
                     ancestor=self.ancestors, weights=self.old_filtering_weights,
                     params=self.bootstrap_filter.params)  #particle = \xi_{k+1}, ancestors = \xi_k
 
@@ -151,7 +151,7 @@ class SVBackwardISSmoothing(SmoothingAlgo):
                 # C. Compute IS weights \bar{\omega}_k with resampled Ancestor \xi_k^{J_{k+1}}  & Particle \xi_{k+1}# shape (P,J)
                 is_weights = self.bootstrap_filter.compute_IS_weights(resampled_ancestors=ancestors,
                                                                       particle=self.particles,
-                                                                      next_observation=self.observations[:, k+1],
+                                                                      next_observation=self.observations[:, k],
                                                                       backward_samples=self.backward_samples,
                                                                       params=self.bootstrap_filter.params) # shape (P,J)
 
@@ -159,7 +159,7 @@ class SVBackwardISSmoothing(SmoothingAlgo):
                 new_tau = self.update_tau(ancestors=ancestors, particle=self.particles,
                                           backward_indices=backward_indices,
                                           IS_weights=is_weights.unsqueeze(-1),
-                                          next_observation=self.observations[:, k + 1], params=params, k=k)
+                                          next_observation=self.observations[:, k], params=params, k=k)
                 self.new_tau = new_tau
                 self.ancestors = self.particles
                 self.taus.append(self.new_tau)

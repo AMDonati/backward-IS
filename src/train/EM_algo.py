@@ -6,8 +6,8 @@ import scipy.optimize as opt
 
 if __name__ == '__main__':
     # hparams
-    num_particles = 10
-    backward_samples = 4
+    num_particles = 100
+    backward_samples = 16
     init_params = [0.8, 0.5, 0.3]
     n_iter = 50
 
@@ -23,13 +23,17 @@ if __name__ == '__main__':
     observations = np.zeros(seq_len)
     states = np.zeros(seq_len)
 
+
+
     # generate synthetic dataset
     for k in range(seq_len):
         states[k] = X
-        next_X = alpha * X + np.random.normal(scale=sigma)
+        next_X = alpha * X + sigma * np.random.normal()
         Y = beta * np.exp(next_X / 2) * np.random.normal()
         observations[k] = Y
         X = next_X
+
+    print("OBSERVATIONS", observations)
 
     observations = observations[np.newaxis, :]
     observations = np.repeat(observations, num_particles, axis=0)
@@ -42,8 +46,8 @@ if __name__ == '__main__':
 
 
     # ---------------------Test state estimation ----------------------------------------------------------------------------------#
-    #index_states = [1,12,23]
-    index_states = [23]
+    index_states = [1,12,23]
+    #index_states = [23]
     num_trials = 50
     for index_state in index_states:
 
@@ -55,6 +59,9 @@ if __name__ == '__main__':
                                          bootstrap_filter=bt_filter, index_state=index_state)
 
         bt_filter.update_SV_params([alpha, sigma, beta])
+
+        print("params of SV model:", smoother.bootstrap_filter.params)
+
         for trials in range(num_trials):
             state_estim = -smoother.estimate_conditional_expectation_of_function(params=[alpha, sigma, beta])
             state_estims[trials] = state_estim
@@ -71,11 +78,15 @@ if __name__ == '__main__':
 
     ######################### ----------------------------------------------------- #################################"
 
-    optim_method = 'L-BFGS-B' # optimizers tried: 'BFGS', 'Nelder-Mead', 'Powell'
+    ######################### ---- Parameter Estimation with EM algo --------------- ###################################
+
+    optim_method = 'Powell' # optimizers tried: 'BFGS', 'Nelder-Mead', 'Powell', 'L-BFGS-B'
+    # BFGS, L-BFGS -> params do not move.
 
     print("INIT PARAMS: {}".format(init_params))
 
     smoother = SVBackwardISSmoothing(backward_samples=backward_samples, observations=observations, bootstrap_filter=bt_filter)
+    bt_filter.update_SV_params(init_params)
 
     # EM algo.
     for iter in range(n_iter):
