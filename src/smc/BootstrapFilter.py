@@ -76,11 +76,14 @@ class SVBootstrapFilter:
         w = F.softmax(log_w, dim=-1)
         return w
 
-    def compute_IS_weights(self, resampled_ancestors, particle, backward_samples, params):
+    def compute_IS_weights(self, resampled_ancestors, particle, next_observation, backward_samples, params):
         particle = particle.unsqueeze(1).repeat((1, backward_samples,1)) # shape (particles, backward_samples, 1)
+        # transition density
         log_w = log_gaussian_density_function(X=particle, mean=params[0]*resampled_ancestors, covariance=params[1]**2)
         log_w2 = manual_log_density_function(X=particle, mean=self.params[0]*resampled_ancestors, covariance=self.params[1]**2 * torch.eye(1))
-        w = F.softmax(log_w, dim=-1)
+        # observation density
+        log_w_o = log_gaussian_density_function(X=next_observation, mean=torch.zeros(next_observation.size()), covariance=params[2]**2 * torch.exp(particle).unsqueeze(-1))
+        w = F.softmax(log_w + log_w_o, dim=-1)
         return w
 
     def get_new_particle(self, next_observation, ancestor, weights, params, resampling=True):
