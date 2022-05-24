@@ -8,7 +8,7 @@ if __name__ == '__main__':
     # hparams
     num_particles = 10
     backward_samples = 4
-    init_params = [0.1, 0.2, 0.3]
+    init_params = [0.8, 0.5, 0.3]
     n_iter = 50
 
     # create synthetic SV dataset
@@ -22,13 +22,12 @@ if __name__ == '__main__':
     X = X0
     observations = np.zeros(seq_len)
 
+    # generate synthetic dataset
     for k in range(seq_len):
         next_X = alpha * X + np.random.normal(scale=sigma)
         Y = beta * np.exp(next_X / 2) * np.random.normal()
         observations[k] = Y
-
-    # upload dataset
-    #observations = np.array([0.01*i for i in range(12)])
+        X = next_X
 
     observations = observations[np.newaxis, :]
     observations = np.repeat(observations, num_particles, axis=0)
@@ -56,7 +55,6 @@ if __name__ == '__main__':
         # eval Q(theta_{k+1), \theta_k)
         new_expectation = smoother.estimate_conditional_expectation_of_function(results.x)
         print("eval Q(theta_k+1, theta_k) at iter {}: {}".format(iter, new_expectation))
-
 
         bt_filter.update_SV_params(results.x)
 

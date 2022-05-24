@@ -54,7 +54,7 @@ class SmoothingAlgo:
         else:
             self.ancestors = torch.normal(
                 mean=torch.zeros(self.num_particles, 1),
-                std=params[1] * torch.ones(self.num_particles, 1))
+                std=params[1] * torch.ones(self.num_particles, 1)) # change with N(0, alpha**2/1-\alpha**2) ?, # shape (P,1)
         self.trajectories = self.ancestors.unsqueeze(-2)
         # self.filtering_weights = self.bootstrap_filter.compute_filtering_weights(hidden=self.ancestors,
         #                                                                          observations=self.observations[:,
@@ -377,9 +377,8 @@ class SVBackwardISSmoothing(SmoothingAlgo):
     def estimation_function(self, ancestors, particle, next_observation, params):
         # next observation : shape (P)
         # particle: shape (P,1)
-        # particle: to tile number of backward samples ? and idenm for next observation ?
-        particle = particle.unsqueeze(1).repeat((1, self.backward_samples, 1))
-        next_observation = next_observation.view(-1, 1, 1).repeat((1, self.backward_samples, 1))
+        particle = particle.unsqueeze(1).repeat((1, self.backward_samples, 1)) # shape (P,J,1)
+        next_observation = next_observation.view(-1, 1, 1).repeat((1, self.backward_samples, 1)) # shape (P,J,1)
         log_transition_density = log_gaussian_density_function(X=particle,
                                                                mean=params[0] * ancestors,
                                                                covariance=params[1] ** 2)
@@ -419,12 +418,12 @@ class SVBackwardISSmoothing(SmoothingAlgo):
             # for loop on time
             for k in range(self.seq_len - 1):
                 # Run bootstrap filter at time k
-                self.old_filtering_weights = self.filtering_weights  # w_k.
-                self.past_tau = self.new_tau
+                self.old_filtering_weights = self.filtering_weights  # w_k. # shape (P)
+                self.past_tau = self.new_tau # shape (P,1)
                 self.particles, self.filtering_weights = self.bootstrap_filter.get_new_particle(
                     next_observation=self.observations[:, k + 1],
                     ancestor=self.ancestors, weights=self.old_filtering_weights,
-                    params=self.bootstrap_filter.params)  # should depend on self.observations[:,k]! No OK, particle = \xi_{k+1}, ancestors = \xi_k
+                    params=self.bootstrap_filter.params)  #particle = \xi_{k+1}, ancestors = \xi_k
 
                 # Backward Simulation
                 # A. Get backward Indice J_{k+1} from past filtering weights w_k
@@ -439,7 +438,7 @@ class SVBackwardISSmoothing(SmoothingAlgo):
                 is_weights = self.bootstrap_filter.compute_IS_weights(resampled_ancestors=ancestors,
                                                                       particle=self.particles,
                                                                       backward_samples=self.backward_samples,
-                                                                      params=self.bootstrap_filter.params)
+                                                                      params=self.bootstrap_filter.params) # shape (P,J)
 
                 # compute $\tau_{k+1}$ with all backward IS weights \bar{\omega}_k,  resampled ancestors \xi_k^{J_{k+1}}, current particle  \xi_{k+1} & all backward_indices J_{k+1}.
                 new_tau = self.update_tau(ancestors=ancestors, particle=self.particles,

@@ -61,7 +61,10 @@ def log_gaussian_density_function(X, mean, covariance):
     return log_d
 
 def manual_log_density_function(X, mean, covariance):
-    part_1 = torch.log(2*math.pi*torch.linalg.det(covariance))
+    if len(covariance.size())>=2:
+        part_1 = torch.log(2*math.pi*torch.linalg.det(covariance))
+    else:
+        part_1 = torch.log(2*math.pi*covariance)
     part_2 = 1/covariance.squeeze() *(X.squeeze()-mean.squeeze())**2
     log_distrib = -0.5 * (part_1 + part_2)
     return log_distrib
