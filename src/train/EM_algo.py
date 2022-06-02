@@ -68,7 +68,7 @@ def get_parser():
                         help="number of particles for the Bootstrap Filter")
     parser.add_argument("-backward_samples", type=int, default=16,
                         help="number of backward samples for the backward IS smoother")
-    parser.add_argument("-init_params", type=str, default="random",
+    parser.add_argument("-init_params", type=str, default="random1",
                         help='initial params for the SV model.')
     parser.add_argument("-algo", type=str, default="BIS",
                         help="PMS or BIS")
@@ -90,10 +90,12 @@ if __name__ == '__main__':
     #  ------------------------------------------------------------ hparams ------------------------------------------------#
     num_particles = args.num_particles
     backward_samples = args.backward_samples
-    if args.init_params == "random":
+    if args.init_params == "random1":
         init_params = [0.5, 0.2, 1.2]
+    if args.init_params == "random2":
+        init_params = [0.75, 1.2, 0.3]
     elif args.init_params == "true":
-        init_params = [0.91, 1.0, 0.5]
+        init_params = [0.85, 1.05, 0.53]
 
     n_iter = args.n_iter
     n_bis = 1
@@ -283,6 +285,7 @@ if __name__ == '__main__':
         params_star = dict(zip(["alpha", "sigma", "beta"], [str(i) for i in results.x]))
         with open(os.path.join(out_folder, "params_star.json"), 'w') as f:
             json.dump(params_star, f)
+        np.save(os.path.join(out_folder, "list_params.npy"), np.array(list_params))
 
         print("done")
 
