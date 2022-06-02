@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=BIS-params-500P-randinit
-#SBATCH --qos=qos_gpu-t3
+#SBATCH --qos=qos_gpu-t4
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=12
 #SBATCH --output=slurm_out/BIS-params-500p-randinit-%j.out
 #SBATCH --error=slurm_out/BIS-params-500p-randinit-%j.err
-#SBATCH --time=20:00:00
+#SBATCH --time=100:00:00
 #SBATCH -A ktz@v100
 
 
