@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=PMS-params-2000P-trueinit
-#SBATCH --qos=qos_gpu-t4
+#SBATCH --qos=qos_gpu-t3
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=12
