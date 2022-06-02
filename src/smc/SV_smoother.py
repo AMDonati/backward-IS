@@ -1,6 +1,6 @@
 import torch
 from smc.BootstrapFilter import RNNBootstrapFilter
-from smc.utils import resample, resample_all_seq, log_gaussian_density_function, manual_log_density_function
+from smc.utils import resample, resample_all_seq_1D, log_gaussian_density_function, manual_log_density_function
 import torch.nn as nn
 import os
 import numpy as np
@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from train.utils import create_logger
 import time
 import math
+
 
 # TODO: à checker
 # std versus variance in different log_densities and torch.normal. OK DONE
@@ -47,17 +48,17 @@ class SmoothingAlgo:
 
     def init_particles(self, params):
         self.ancestors = torch.normal(
-                mean=torch.zeros(self.num_particles, 1),
-                std=params[0]/math.sqrt(1-params[0]**2)) # change with N(0, alpha**2/1-\alpha**2) ?, # shape (P,1)
+            mean=torch.zeros(self.num_particles, 1),
+            std=abs(params[0]) / math.sqrt(1 - params[0] ** 2))  # change with N(0, alpha**2/1-\alpha**2) ?, # shape (P,1)
         self.trajectories = self.ancestors.unsqueeze(-2)
         self.filtering_weights = self.bootstrap_filter.compute_filtering_weights(particle=self.ancestors,
                                                                                  observation=self.observations[:,
-                                                                                             0], params=params)  # decide if take $Y_0 of $Y_1$
+                                                                                             0],
+                                                                                 params=params)  # decide if take $Y_0 of $Y_1$
         self.past_tau = torch.zeros(self.num_particles, 1)
         self.new_tau = self.past_tau
         self.taus = []
         self.all_IS_weights = []
-
 
 
 class SVBackwardISSmoothing(SmoothingAlgo):
@@ -87,12 +88,11 @@ class SVBackwardISSmoothing(SmoothingAlgo):
             out = ancestors.new_zeros(ancestors.size())
         return out
 
-
     def log_density_estimation_function(self, ancestors, particle, next_observation, params, k=None):
         # next observation : shape (P)
         # particle: shape (P,1)
-        particle = particle.unsqueeze(1).repeat((1, self.backward_samples, 1)) # shape (P,J,1)
-        next_observation = next_observation.view(-1, 1, 1).repeat((1, self.backward_samples, 1)) # shape (P,J,1)
+        particle = particle.unsqueeze(1).repeat((1, self.backward_samples, 1))  # shape (P,J,1)
+        next_observation = next_observation.view(-1, 1, 1).repeat((1, self.backward_samples, 1))  # shape (P,J,1)
         log_transition_density = log_gaussian_density_function(X=particle,
                                                                mean=params[0] * ancestors,
                                                                covariance=params[1] ** 2)
@@ -105,7 +105,7 @@ class SVBackwardISSmoothing(SmoothingAlgo):
         # log_o2 = manual_log_density_function(X=next_observation, mean=torch.zeros(size=next_observation.size()), covariance=self.bootstrap_filter.params[2]**2*covariance)
         return (log_transition_density + log_observation_density).unsqueeze(-1)
 
-    def update_tau(self, ancestors, particle, backward_indices, IS_weights, next_observation, params, k=None):
+    def update_tau(self, ancestors, particle, backward_indices, IS_weights, next_observation, past_tau, params, k=None):
         # '''
         # :param ancestors: ancestors particles $\xi_{k-1}^Jk$ sampled with backward_indices. tensor of shape (B, backward_samples, hidden_size)
         # :param particle: $\xi_k^l$ (here not used in the formula of the estimation function): tensor of shape (B, 1, hidden_size)
@@ -115,29 +115,50 @@ class SVBackwardISSmoothing(SmoothingAlgo):
         # '''
         # '''update $\tau_k^l from $\tau_{k-1}^l, $w_{k-1]^l, $\xi_{k-1}^Jk$ and from Jk(j), \Tilde(w)(l,j) for all j in 0...backward samples'''
 
-        resampled_tau = resample(self.past_tau.repeat(backward_indices.size(0), 1, 1),
+        resampled_tau = resample(past_tau.repeat(backward_indices.size(0), 1, 1),
                                  backward_indices)  # (particles,backward_samples, 1) # OK, function resampled checked.
 
         new_estimate = self.estimation_function(ancestors=ancestors, particle=particle,
                                                 next_observation=next_observation, params=params, k=k)  # shape (P,J,1)
 
         new_tau_element = IS_weights * (
-                    resampled_tau + new_estimate)  # shape (P,J,1)  # (particles, backward_samples, 1)
+                resampled_tau + new_estimate)  # shape (P,J,1)  # (particles, backward_samples, 1)
         new_tau = new_tau_element.sum(1)
         return new_tau  # shape (P,1)
 
-    def estimate_conditional_expectation_of_function(self, params):
+    def compute_expectation_from_saved_elements(self, params):
+        past_tau = self.past_tau
+        for k in range(self.seq_len):
+            ancestors = self.list_resampled_ancestors[k]
+            particle = self.list_particles[k]
+            backward_indices = self.list_backward_indices[k]
+            IS_weights = self.list_IS_weights[k].unsqueeze(-1)
+            next_observation = self.observations[:, k]
+            new_tau = self.update_tau(ancestors=ancestors, particle=particle, backward_indices=backward_indices,
+                                      IS_weights=IS_weights, next_observation=next_observation, past_tau=past_tau,
+                                      params=params)
+            past_tau = new_tau
+
+        return -((new_tau.squeeze() * self.filtering_weights).sum().numpy())
+
+
+    def save_smoothing_elements(self):
+        self.list_resampled_ancestors = []
+        self.list_particles = []
+        self.list_backward_indices = []
+        self.list_IS_weights = []
+
         self.init_particles(self.bootstrap_filter.params)
         with torch.no_grad():
             # for loop on time
             for k in range(self.seq_len):
                 # Run bootstrap filter at time k
                 self.old_filtering_weights = self.filtering_weights  # w_k. # shape (P)
-                self.past_tau = self.new_tau # shape (P,1)
+                # self.past_tau = self.new_tau  # shape (P,1)
                 self.particles, self.filtering_weights = self.bootstrap_filter.get_new_particle(
                     next_observation=self.observations[:, k],
                     ancestor=self.ancestors, weights=self.old_filtering_weights,
-                    params=self.bootstrap_filter.params)  #particle = \xi_{k+1}, ancestors = \xi_k
+                    params=self.bootstrap_filter.params)  # particle = \xi_{k+1}, ancestors = \xi_k
 
                 # Backward Simulation
                 # A. Get backward Indice J_{k+1} from past filtering weights w_k
@@ -153,15 +174,167 @@ class SVBackwardISSmoothing(SmoothingAlgo):
                                                                       particle=self.particles,
                                                                       next_observation=self.observations[:, k],
                                                                       backward_samples=self.backward_samples,
-                                                                      params=self.bootstrap_filter.params) # shape (P,J)
+                                                                      params=self.bootstrap_filter.params)  # shape (P,J)
+
+                # compute $\tau_{k+1}$ with all backward IS weights \bar{\omega}_k,  resampled ancestors \xi_k^{J_{k+1}}, current particle  \xi_{k+1} & all backward_indices J_{k+1}.
+                # new_tau = self.update_tau(ancestors=ancestors, particle=self.particles,
+                #                           backward_indices=backward_indices,
+                #                           IS_weights=is_weights.unsqueeze(-1),
+                #                           next_observation=self.observations[:, k], params=params, k=k, past_tau=self.past_tau)
+
+                # save elements in list for computing tau later on
+                self.list_resampled_ancestors.append(ancestors)
+                self.list_particles.append(self.particles)
+                self.list_backward_indices.append(backward_indices)
+                self.list_IS_weights.append(is_weights)
+
+                # update elements
+                self.ancestors = self.particles
+
+    def estimate_conditional_expectation_of_function(self, params):
+        self.init_particles(self.bootstrap_filter.params)
+        with torch.no_grad():
+            # for loop on time
+            for k in range(self.seq_len):
+                # Run bootstrap filter at time k
+                self.old_filtering_weights = self.filtering_weights  # w_k. # shape (P)
+                self.past_tau = self.new_tau  # shape (P,1)
+                self.particles, self.filtering_weights = self.bootstrap_filter.get_new_particle(
+                    next_observation=self.observations[:, k],
+                    ancestor=self.ancestors, weights=self.old_filtering_weights,
+                    params=self.bootstrap_filter.params)  # particle = \xi_{k+1}, ancestors = \xi_k
+
+                # Backward Simulation
+                # A. Get backward Indice J_{k+1} from past filtering weights w_k
+                backward_indices = torch.multinomial(self.old_filtering_weights,
+                                                     self.num_particles * self.backward_samples, replacement=True)
+                backward_indices = backward_indices.view(self.num_particles, self.backward_samples)  # shape (B, J)
+
+                # B. Select Ancestor \xi_k^{J_{k+1}} with J.
+                ancestors = resample(self.ancestors.repeat(backward_indices.size(0), 1, 1),
+                                     backward_indices)  # shape (P, J, 1) # ok FUNCTION RESAMPLE CHECKED.
+                # C. Compute IS weights \bar{\omega}_k with resampled Ancestor \xi_k^{J_{k+1}}  & Particle \xi_{k+1}# shape (P,J)
+                is_weights = self.bootstrap_filter.compute_IS_weights(resampled_ancestors=ancestors,
+                                                                      particle=self.particles,
+                                                                      next_observation=self.observations[:, k],
+                                                                      backward_samples=self.backward_samples,
+                                                                      params=self.bootstrap_filter.params)  # shape (P,J)
 
                 # compute $\tau_{k+1}$ with all backward IS weights \bar{\omega}_k,  resampled ancestors \xi_k^{J_{k+1}}, current particle  \xi_{k+1} & all backward_indices J_{k+1}.
                 new_tau = self.update_tau(ancestors=ancestors, particle=self.particles,
                                           backward_indices=backward_indices,
                                           IS_weights=is_weights.unsqueeze(-1),
-                                          next_observation=self.observations[:, k], params=params, k=k)
+                                          next_observation=self.observations[:, k], params=params, k=k,
+                                          past_tau=self.past_tau)
                 self.new_tau = new_tau
                 self.ancestors = self.particles
                 self.taus.append(self.new_tau)
 
-        return -((self.new_tau.squeeze()*self.filtering_weights).sum().numpy())
+        return -((self.new_tau.squeeze() * self.filtering_weights).sum().numpy())
+
+class PoorManSmoothing(SmoothingAlgo):
+    def __init__(self, bootstrap_filter, observations, out_folder=None,
+                 index_state=None, logger=None):
+        # '''
+        # :param bootstrap_filter: Class Implementing a Bootstrap filter algorithm.
+        # :param observations: sequence of observations generated by a stochastic RNN: tensor of shape (num_samples=B, num_particles, seq_len, output_size)
+        # :param states: sequence of hidden states generated by a stochastic RNN: tensor of shape (num_samples, num_particles, seq_len, hidden_size)
+        # :param backward_samples: number of backward_samples for the Backward IS Smoothing algo.
+        # :param estimation_function: Fonction to estimate: in our case $mathbb[E][X_0|Y_{0:n}]$
+        # '''
+        super(PoorManSmoothing, self).__init__(bootstrap_filter=bootstrap_filter, observations=observations,
+                                               out_folder=out_folder,
+                                               logger=logger)
+        self.index_state = index_state
+        if index_state is None:
+            print("PARAMETER ESTIMATION")
+        else:
+            print("STATE ESTIMATION for state: {}".format(index_state))
+
+    def log_density_estimation_function(self, params, k=None):
+        log_densities = []
+        """self.observations: shape (P,S)"""
+        """self.trajectories: shape (P, S+1, 1)"""
+        for k in range(self.observations.shape[1]):
+            ancestor = self.trajectories[:,k] # trajectories has one more sequence element than observations (fir initial state X_0).
+            particle = self.trajectories[:,k+1]
+            next_observation = self.observations[:,k]
+            log_transition_density = log_gaussian_density_function(X=particle,
+                                                               mean=params[0] * ancestor,
+                                                               covariance=params[1] ** 2)
+            log_t2 = manual_log_density_function(X=particle, mean=self.bootstrap_filter.params[0]*ancestor, covariance=self.bootstrap_filter.params[1]**2*torch.eye(1))
+            covariance = torch.exp(particle).unsqueeze(-1)  # shape (B,J,1,1)
+            log_observation_density = log_gaussian_density_function(X=next_observation.unsqueeze(-1),
+                                                                mean=torch.zeros(size=next_observation.unsqueeze(-1).size()),
+                                                                covariance=params[
+                                                                               2] ** 2 * covariance)
+            log_o2 = manual_log_density_function(X=next_observation, mean=torch.zeros(size=next_observation.size()), covariance=self.bootstrap_filter.params[2]**2*covariance)
+            log_densities.append(log_transition_density + log_observation_density)
+
+        log_density = torch.stack(log_densities, dim=0).sum(0) # shape (P) or shape (P,1)
+        return log_density
+
+    def save_smoothing_elements(self):
+        self.init_particles(self.bootstrap_filter.params)
+        with torch.no_grad():
+            # for loop on time
+            indices_matrix, particles_seq = [], []
+            particles_seq.append(self.ancestors)
+            for k in range(self.seq_len): #TODO: check loop...
+                # Selection: resample all past trajectories with current indice i_t
+                self.old_filtering_weights = self.filtering_weights
+                i_t = torch.multinomial(self.old_filtering_weights, num_samples=self.num_particles, replacement=True)
+                indices_matrix.append(i_t.cpu().squeeze())
+                # resample trajectories 'online'
+                resampled_trajectories = resample_all_seq_1D(self.trajectories, i_t=i_t.unsqueeze(-1))
+                ancestor = resampled_trajectories[:, k]  # get resampled ancestor $\xi_{k-1}$. Ok function checked.
+                # Mutation: Run bootstrap filter at time k to get new particle without resampling
+                self.particles, self.filtering_weights = self.bootstrap_filter.get_new_particle(
+                    next_observation=self.observations[:, k],
+                    ancestor=ancestor, weights=self.old_filtering_weights,
+                    params=self.bootstrap_filter.params)  # particle = \xi_{k+1}, ancestors = \xi_k
+                particles_seq.append(self.particles)
+                # append resampled trajectories to new particle
+                self.trajectories = torch.cat([resampled_trajectories, self.particles.unsqueeze(-2)], dim=-2) # shape (P,S+1,1)
+            indices_matrix = torch.stack(indices_matrix, dim=0)  # (seq_len, P)
+            particles_seq = torch.stack(particles_seq, dim=0) #TODO: check resampling with get_genealogy and resample_trajectories using particle_seq and indices_matrix
+
+        return (particles_seq, indices_matrix)
+
+    def compute_expectation_from_saved_elements(self, params):
+        if self.index_state is None:
+            estimation = self.log_density_estimation_function(params=params)
+            estimation = (self.filtering_weights * estimation).sum(0).squeeze().numpy()
+        else:
+            estimation = (self.filtering_weights * self.trajectories[:,self.index_state].squeeze()).sum(0).squeeze().numpy()
+        return -estimation
+
+
+    def get_genealogy(self, indices_matrix):
+        n_particles = indices_matrix.shape[-1]
+        n_times = indices_matrix.shape[0]
+        particle_indices = np.arange(n_particles, dtype=int)
+        # Array contanant la genealogie
+        # La genealogie est un array n_times * n_particles
+        # A chaque ligne on a l'indice de particule en lequel passe la trajectoire
+        # Au debut tout le monde passe par sa particule associÃ©e.
+        genealogy = np.repeat([particle_indices], n_times + 1, axis=0)
+        # Maintenant on actualise
+        for t in range(0, n_times):
+            old_genealogy = genealogy  # A chaque debut, on stocke la "vieille genealogie"
+            # Ici, pour l'exemple, un resampling uniforme
+            indice_resampling = indices_matrix[t]
+            # Maintenant, pour chaque colonne, la colonne entiere est remplacee par l'ancienne associÃ©e Ã  la particule
+            genealogy = old_genealogy[:, indice_resampling]
+            # Attention, Ã  chaque fois on restipule bien qu'au temps final, on passe par le bon indice de particule
+            genealogy[t + 1:, :] = particle_indices
+        return genealogy
+
+    def resample_trajectories(self, trajectories, genealogy):
+        n_particles = genealogy.shape[-1]
+        n_times = trajectories.shape[0]
+        num_dim = trajectories.shape[-1]
+        resampled_trajectories = np.zeros(shape=(n_times, n_particles, num_dim))
+        for t in reversed(range(n_times)):
+            resampled_trajectories[t, :, :] = trajectories[t, genealogy[t, :], :]  # (seq_len, P, hidden_size)
+        return np.transpose(resampled_trajectories, axes=[1, 0, 2])

@@ -279,6 +279,10 @@ class RNNBackwardISSmoothing(SmoothingAlgo):
         # print("NEW TAU", new_tau[:, 0])
         return new_tau
 
+
+
+
+
     def estimate_conditional_expectation_of_function(self):
         start_time = time.time()
         self.init_particles()

@@ -31,6 +31,15 @@ def resample_all_seq(params, i_t):
     resampled_params = torch.gather(input=params, index=I, dim=1)
     return resampled_params
 
+def resample_all_seq_1D(params, i_t):
+    '''
+    :param params > shape (P,S,1)
+    :param i_t: current indice > shape (P,1)
+    '''
+    I = i_t.unsqueeze(1).repeat(1, params.size(1),1) # shape (P,S,1)
+    resampled_params = torch.gather(input=params, index=I, dim=0)
+    return resampled_params
+
 
 def estimation_function_X(k, X, index):
     if k == index:
