@@ -22,9 +22,9 @@ OUT_PATH="experiments"
 NUM_PARTICLES=500
 BACKWARD_SAMPLES=41
 ALGO="BIS"
-NUM_ITER=50
+N_ITER=50
 INIT_PARAMS="random"
 ESTIM="parameter"
 SEQ_LEN=100
 
-srun python -u src/train/EM_algo.py -data_path $DATA_PATH -out_path $OUT_PATH -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -algo $ALGO -num_iter $NUM_ITER -init_params $INIT_PARAMS -estim $ESTIM -seq_len $SEQ_LEN
+srun python -u src/train/EM_algo.py -data_path $DATA_PATH -out_path $OUT_PATH -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -algo $ALGO -n_iter $N_ITER -init_params $INIT_PARAMS -estim $ESTIM -seq_len $SEQ_LEN
