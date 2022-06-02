@@ -68,7 +68,7 @@ def get_parser():
                         help="number of particles for the Bootstrap Filter")
     parser.add_argument("-backward_samples", type=int, default=16,
                         help="number of backward samples for the backward IS smoother")
-    parser.add_argument("-init_params", nargs='+', type=float, default=[0.91, 1.0, 0.5],
+    parser.add_argument("-init_params", type=str, default="random",
                         help='initial params for the SV model.')
     parser.add_argument("-algo", type=str, default="BIS",
                         help="PMS or BIS")
@@ -88,7 +88,11 @@ if __name__ == '__main__':
     #  ------------------------------------------------------------ hparams ------------------------------------------------#
     num_particles = args.num_particles
     backward_samples = args.backward_samples
-    init_params = args.init_params
+    if args.init_params == "random":
+        init_params = [0.5, 0.2, 1.2]
+    elif args.init_params == "true":
+        init_params = [0.91, 1.0, 0.5]
+
     n_iter = args.n_iter
     n_bis = 1
 
