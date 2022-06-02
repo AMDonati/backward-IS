@@ -74,6 +74,8 @@ def get_parser():
                         help="PMS or BIS")
     parser.add_argument("-n_iter", type=int, default=50,
                         help="number of iterations for the EM algo.")
+    parser.add_argument("-n_trials", type=int, default=50,
+                        help="number of trials for state estimation.")
     parser.add_argument("-seq_len", type=int, default=100,
                         help="number of observations.")
     parser.add_argument("-estim", type=str, default="parameter",
@@ -161,9 +163,9 @@ if __name__ == '__main__':
 
     # ---------------------Test state estimation ----------------------------------------------------------------------------------#
     if state_estimation:
-        index_states = [1, 12, 23]
+        index_states = [1, 24, 49, 99]
         # index_states = [23]
-        num_trials = 50
+        num_trials = args.n_trials
         states_estims = np.zeros((len(index_states), num_trials))
         results = dict.fromkeys(index_states)
         for iter, index_state in enumerate(index_states):
