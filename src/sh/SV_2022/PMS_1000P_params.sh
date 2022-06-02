@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=PMS-params-1000P-randinit
-#SBATCH --qos=qos_gpu-t4
+#SBATCH --qos=qos_gpu-t3
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=12
 #SBATCH --output=slurm_out/PMS-params-1000p-randinit-%j.out
 #SBATCH --error=slurm_out/PMS-params-1000p-randinit-%j.err
-#SBATCH --time=100:00:00
+#SBATCH --time=20:00:00
 #SBATCH -A ktz@v100
 
 
