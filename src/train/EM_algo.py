@@ -61,7 +61,7 @@ def plot_evol_params(list_params, true_params, out_file):
 def get_parser():
     parser = argparse.ArgumentParser()
     # data parameters:
-    parser.add_argument("-data_path", type=str, default="../data/SV",
+    parser.add_argument("-data_path", type=str,
                         help="path for uploading the observations and states")
     parser.add_argument("-out_path", type=str, default="experiments")
     parser.add_argument("-num_particles", type=int, default=100,
@@ -110,6 +110,9 @@ if __name__ == '__main__':
 
     # create out_folder for saving plots:
     out_folder = args.out_path
+    if not os.path.isdir(out_folder):
+        os.makedirs(out_folder)
+
 
     # ----------------------------------------- create synthetic SV dataset --------------------------------------
     alpha = 0.91
@@ -134,11 +137,10 @@ if __name__ == '__main__':
             X = next_X
 
         print("saving data in .npy file...")
-        data_path = os.path.join("data", "SV")
-        if not os.path.isdir(data_path):
-            os.makedirs(data_path)
-        np.save(os.path.join(data_path, 'observations.npy'), observations)
-        np.save(os.path.join(data_path, 'states.npy'), states)
+        #data_path = os.path.join("data", "SV")
+        np.save(os.path.join(out_folder, 'observations.npy'), observations)
+        np.save(os.path.join(out_folder, 'states.npy'), states)
+
     else:
         print("uploading observations and states")
         observations = np.load(os.path.join(args.data_path, "observations.npy"))

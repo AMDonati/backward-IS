@@ -280,7 +280,7 @@ class PoorManSmoothing(SmoothingAlgo):
             # for loop on time
             indices_matrix, particles_seq = [], []
             particles_seq.append(self.ancestors)
-            for k in range(self.seq_len): #TODO: check loop...
+            for k in range(self.seq_len):
                 # Selection: resample all past trajectories with current indice i_t
                 self.old_filtering_weights = self.filtering_weights
                 i_t = torch.multinomial(self.old_filtering_weights, num_samples=self.num_particles, replacement=True)
