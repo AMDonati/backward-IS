@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=BIS-params-500P-randinit
-#SBATCH --qos=qos_gpu-t3
+#SBATCH --qos=qos_gpu-t4
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --output=slurm_out/BIS-params-1000p-trueinit-%j.out
 #SBATCH --error=slurm_out/BIS-params-1000p-trueinit-%j.err
-#SBATCH --time=20:00:00
+#SBATCH --time=100:00:00
 #SBATCH -A ktz@v100
 
 
@@ -20,7 +20,7 @@ export PYTHONPATH=src:${PYTHONPATH}
 DATA_PATH="data/SV"
 OUT_PATH="experiments"
 NUM_PARTICLES=1000
-BACKWARD_SAMPLES=32
+BACKWARD_SAMPLES=16
 ALGO="BIS"
 N_ITER=50
 INIT_PARAMS="true"
