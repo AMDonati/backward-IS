@@ -8,7 +8,7 @@
 #SBATCH --output=slurm_out/BIS-params-1000p-randinit-%j.out
 #SBATCH --error=slurm_out/BIS-params-1000p-randinit-%j.err
 #SBATCH --time=20:00:00
-#SBATCH -A ktz@gpu
+#SBATCH -A ktz@v100
 
 export TMPDIR=$JOBSCRATCH
 module purge

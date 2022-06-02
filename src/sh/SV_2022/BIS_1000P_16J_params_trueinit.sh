@@ -8,7 +8,7 @@
 #SBATCH --output=slurm_out/BIS-params-1000p-trueinit-%j.out
 #SBATCH --error=slurm_out/BIS-params-1000p-trueinit-%j.err
 #SBATCH --time=20:00:00
-#SBATCH -A ktz@gpu
+#SBATCH -A ktz@v100
 
 
 export TMPDIR=$JOBSCRATCH
