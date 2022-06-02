@@ -4,8 +4,8 @@
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
-#SBATCH --output=slurm_out/BIS-params-550p-trueinit-%j.out
-#SBATCH --error=slurm_out/-%j.err
+#SBATCH --output=slurm_out/BIS-params-500p-trueinit-%j.out
+#SBATCH --error=slurm_out/BIS-params-500p-trueinit-%j.err
 #SBATCH --time=100:00:00
 #SBATCH -A ktz@v100
 
