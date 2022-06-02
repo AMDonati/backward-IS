@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=BIS-state-1000P
+#SBATCH --job-name=BIS700-state-
 #SBATCH --qos=qos_gpu-t4
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=12
-#SBATCH --output=slurm_out/BIS-state-1000p-%j.out
-#SBATCH --error=slurm_out/BIS-state-1000p-%j.err
+#SBATCH --output=slurm_out/BIS-state-700p-%j.out
+#SBATCH --error=slurm_out/BIS-state-700p-%j.err
 #SBATCH --time=100:00:00
 #SBATCH -A ktz@v100
 
@@ -19,7 +19,7 @@ export PYTHONPATH=src:${PYTHONPATH}
 
 DATA_PATH="data/SV"
 OUT_PATH="experiments"
-NUM_PARTICLES=1000
+NUM_PARTICLES=700
 BACKWARD_SAMPLES=16
 ALGO="BIS"
 N_ITER=50
