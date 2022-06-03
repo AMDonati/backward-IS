@@ -6,6 +6,7 @@ import scipy.optimize as opt
 import matplotlib.pyplot as plt
 import os, json
 import argparse
+import time
 
 
 def plot_EM_results(results, out_folder, out_file):
@@ -189,12 +190,15 @@ if __name__ == '__main__':
 
             print("params of SV model:", smoother.bootstrap_filter.params)
 
+
             for trials in range(num_trials):
+                start_time = time.time()
                 if algo == "BIS":
                     state_estim = -smoother.estimate_conditional_expectation_of_function(params=[alpha, sigma, beta])
                 elif algo == "PMS":
                     smoother.save_smoothing_elements()
                     state_estim = -smoother.compute_expectation_from_saved_elements([alpha, sigma, beta])
+                print("time for one estimation", time.time()-start_time)
                 states_estims[iter, trials] = state_estim
 
             print("TRUE STATE", states[index_state])
@@ -251,6 +255,8 @@ if __name__ == '__main__':
 
             print("PARAMS in SMOOTHING:", smoother.bootstrap_filter.params)
             # expectation = smoother.estimate_conditional_expectation_of_function(bt_filter.params)
+
+            start_time = time.time()
             smoother.save_smoothing_elements()
             expectation = smoother.compute_expectation_from_saved_elements(params=bt_filter.params)
             expectations_results.append(expectation)
@@ -258,6 +264,8 @@ if __name__ == '__main__':
 
             results = opt.minimize(fun=smoother.compute_expectation_from_saved_elements, x0=bt_filter.params,
                                    method=optim_method, options=options)
+
+            print("time for one EM", time.time()-start_time)
 
             if "allvecs" in results.keys():
                 fn_evals = [smoother.compute_expectation_from_saved_elements(vecs) for vecs in results["allvecs"]]
