@@ -121,6 +121,8 @@ if __name__ == '__main__':
     alpha = 0.91
     sigma = 1.0
     beta = 0.5
+    # values paper Jimmy: 0.8,O.1,1.
+    # do with 1000 observations.
     seq_len = args.seq_len
 
     if args.data_path is None:
