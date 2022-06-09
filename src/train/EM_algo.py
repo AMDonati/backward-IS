@@ -96,7 +96,7 @@ if __name__ == '__main__':
     if args.init_params == "random2":
         init_params = [0.75, 1.2, 0.3]
     elif args.init_params == "true":
-        init_params = [0.85, 1.05, 0.53]
+        init_params = [0.85, 0.15, 0.53]
 
     n_iter = args.n_iter
     n_bis = 1
@@ -119,7 +119,7 @@ if __name__ == '__main__':
 
     # ----------------------------------------- create synthetic SV dataset --------------------------------------
     alpha = 0.91
-    sigma = 1.0
+    sigma = 0.1
     beta = 0.5
     # values paper Jimmy: 0.8,O.1,1.
     # do with 1000 observations.
