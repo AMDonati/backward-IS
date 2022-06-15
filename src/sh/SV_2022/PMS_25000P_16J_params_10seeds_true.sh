@@ -8,7 +8,7 @@
 #SBATCH --output=slurm_out/PMS10seeds-params-100p-trueinit-%j.out
 #SBATCH --error=slurm_out/PMS10seeds-params-100p-trueinit-%j.err
 #SBATCH --time=20:00:00
-#SBATCH -A ktz@v100
+#SBATCH -A ajx@v100
 
 
 export TMPDIR=$JOBSCRATCH
