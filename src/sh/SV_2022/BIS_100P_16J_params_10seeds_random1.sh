@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=PMS-random2
+#SBATCH --job-name=BIS-random2
 #SBATCH --qos=qos_gpu-t3
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
 #SBATCH --array=1-10
 #SBATCH --cpus-per-task=8
-#SBATCH --output=slurm_out/PMS10seeds-params-100p-trueinit-%j.out
-#SBATCH --error=slurm_out/PMS10seeds-params-100p-trueinit-%j.err
+#SBATCH --output=slurm_out/BIS10seeds-params-100p-randinit2-%j.out
+#SBATCH --error=slurm_out/BIS10seeds-params-100p-randinit2-%j.err
 #SBATCH --time=20:00:00
 #SBATCH -A ktz@v100
 
@@ -18,11 +18,11 @@ conda activate back-is
 
 export PYTHONPATH=src:${PYTHONPATH}
 
-NUM_PARTICLES=25000
+NUM_PARTICLES=100
 BACKWARD_SAMPLES=16
-ALGO="PMS"
+ALGO="BIS"
 N_ITER=50
-INIT_PARAMS="true"
+INIT_PARAMS="random1"
 ESTIM="parameter"
 SEQ_LEN=1000
 
