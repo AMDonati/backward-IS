@@ -118,9 +118,9 @@ if __name__ == '__main__':
 
 
     # ----------------------------------------- create synthetic SV dataset --------------------------------------
-    alpha = 0.91
+    alpha = 0.8
     sigma = 0.1
-    beta = 0.5
+    beta = 1.0
     # values paper Jimmy: 0.8,O.1,1.
     # do with 1000 observations.
     seq_len = args.seq_len
