@@ -124,6 +124,7 @@ if __name__ == '__main__':
 
     # ----------------------------------------- create synthetic SV dataset --------------------------------------
     # values paper Jimmy: 0.8,O.1,1.
+    # other params: 0.91, 1.0, 0.5
     # do with 1000 observations.
     seq_len = args.seq_len
 
@@ -144,7 +145,6 @@ if __name__ == '__main__':
             X = next_X
 
         print("saving data in .npy file...")
-        #data_path = os.path.join("data", "SV")
         np.save(os.path.join(out_folder, 'observations.npy'), observations)
         np.save(os.path.join(out_folder, 'states.npy'), states)
 
@@ -238,6 +238,11 @@ if __name__ == '__main__':
                                                                               init_params[1], init_params[2]))
         if not os.path.isdir(out_folder):
             os.makedirs(out_folder)
+
+        print("saving data in .npy file...")
+        np.save(os.path.join(out_folder, 'observations.npy'), observations)
+        np.save(os.path.join(out_folder, 'states.npy'), states)
+
         maxiter = 300
         options = {'maxiter': maxiter, 'maxfev': None, 'disp': True, 'return_all': True, 'initial_simplex': None,
                    'xatol': 0.0001, 'fatol': 0.0001, 'adaptive': False}

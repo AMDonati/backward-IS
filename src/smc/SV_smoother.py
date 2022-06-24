@@ -14,7 +14,6 @@ import math
 # std versus variance in different log_densities and torch.normal. OK DONE
 # resample function in Backward IS. OK DONE.
 # compute of log transition density by "batch"! OK DONE.
-# formula for computing backward IS weights à checker. Right now: use q_k and not lk = g_k * q_k ...
 
 class SmoothingAlgo:
     def __init__(self, bootstrap_filter, observations, out_folder,
