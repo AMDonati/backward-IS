@@ -296,6 +296,7 @@ class PoorManSmoothing(SmoothingAlgo):
                 particles_seq.append(self.particles)
                 # append resampled trajectories to new particle
                 self.trajectories = torch.cat([resampled_trajectories, self.particles.unsqueeze(-2)], dim=-2) # shape (P,S+1,1)
+            indices_matrix.append(torch.arange(0,self.num_particles, dtype=torch.int32))
             indices_matrix = torch.stack(indices_matrix, dim=0)  # (seq_len, P)
             particles_seq = torch.stack(particles_seq, dim=0) #TODO: check resampling with get_genealogy and resample_trajectories using particle_seq and indices_matrix
 
@@ -336,5 +337,5 @@ class PoorManSmoothing(SmoothingAlgo):
         num_dim = trajectories.shape[-1]
         resampled_trajectories = np.zeros(shape=(n_times, n_particles, num_dim))
         for t in reversed(range(n_times)):
-            resampled_trajectories[t, :, :] = trajectories[t, genealogy[t, :], :]  # (seq_len, P, hidden_size)
+            resampled_trajectories[t, :] = trajectories[t, genealogy[t, :]]  # (seq_len, P, hidden_size)
         return np.transpose(resampled_trajectories, axes=[1, 0, 2])

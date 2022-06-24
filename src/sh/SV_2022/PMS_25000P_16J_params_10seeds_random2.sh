@@ -28,5 +28,5 @@ SEQ_LEN=750
 
 set -x
 echo "now processing task id:: " ${SLURM_ARRAY_TASK_ID}
-OUT_PATH=experiments/1Oseeds_sigma0.1/${SLURM_ARRAY_TASK_ID}
+OUT_PATH=experiments/1Oseeds_3/${SLURM_ARRAY_TASK_ID}
 srun python -u src/train/EM_algo.py -out_path ${OUT_PATH} -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -algo $ALGO -n_iter $N_ITER -init_params $INIT_PARAMS -estim $ESTIM -seq_len $SEQ_LEN

@@ -91,12 +91,17 @@ if __name__ == '__main__':
     #  ------------------------------------------------------------ hparams ------------------------------------------------#
     num_particles = args.num_particles
     backward_samples = args.backward_samples
+
+    alpha = 0.98
+    sigma = 0.1
+    beta = 0.05
+
     if args.init_params == "random1":
         init_params = [0.5, 0.2, 1.2]
     if args.init_params == "random2":
         init_params = [0.75, 1.2, 0.3]
     elif args.init_params == "true":
-        init_params = [0.85, 0.15, 0.53]
+        init_params = [alpha-0.05, sigma+0.05, beta+0.02]
 
     n_iter = args.n_iter
     n_bis = 1
@@ -118,9 +123,6 @@ if __name__ == '__main__':
 
 
     # ----------------------------------------- create synthetic SV dataset --------------------------------------
-    alpha = 0.8
-    sigma = 0.1
-    beta = 1.0
     # values paper Jimmy: 0.8,O.1,1.
     # do with 1000 observations.
     seq_len = args.seq_len
@@ -231,8 +233,8 @@ if __name__ == '__main__':
         optim_method = 'Powell'  # optimizers tried: 'BFGS', 'Nelder-Mead', 'Powell', 'L-BFGS-B'
         # BFGS, L-BFGS -> params do not move.
         out_folder = os.path.join(out_folder,
-                                  "{}_EM_{}_{}P_{}J_{}S_initparams-{}-{}-{}".format(algo, optim_method, num_particles, backward_samples,
-                                                                              seq_len, init_params[0],
+                                  "{}_EM_{}_{}P_{}J_{}S_params-{}-{}-{}-initparams-{}-{}-{}".format(algo, optim_method, num_particles, backward_samples,
+                                                                              seq_len, alpha, sigma, beta, init_params[0],
                                                                               init_params[1], init_params[2]))
         if not os.path.isdir(out_folder):
             os.makedirs(out_folder)
