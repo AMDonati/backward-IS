@@ -24,7 +24,7 @@ ALGO="PMS"
 N_ITER=50
 INIT_PARAMS="random2"
 ESTIM="parameter"
-SEQ_LEN=750
+SEQ_LEN=1000
 
 set -x
 echo "now processing task id:: " ${SLURM_ARRAY_TASK_ID}
