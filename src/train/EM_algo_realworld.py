@@ -209,9 +209,9 @@ if __name__ == '__main__':
 
     plot_observations(observations_raw, generated_observations, os.path.join(out_folder, 'plot_observations.png'))
 
-    mse = np.mean(0.5 * np.square(observations_raw - generated_observations))
-    with open(os.path.join(out_folder, "mse.json"), "w") as f:
-        json.dump(mse, f)
+    mse = 0.5 * np.square(observations_raw - generated_observations)
+    np.save(os.path.join(out_folder, "mses.npy"), mse)
+    np.save(os.path.join(out_folder, "generated_observations.npy"), generated_observations)
 
 
 
