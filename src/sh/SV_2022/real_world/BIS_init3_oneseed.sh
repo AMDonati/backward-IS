@@ -18,7 +18,7 @@ conda activate back-is
 export PYTHONPATH=src:${PYTHONPATH}
 
 DATA_PATH="data"
-OUT_PATH="experiments_RW"
+OUT_PATH="experiments_RW/exp_params"
 NUM_PARTICLES=100
 BACKWARD_SAMPLES=16
 ALGO="BIS"
