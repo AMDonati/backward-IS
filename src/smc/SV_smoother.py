@@ -253,14 +253,14 @@ class PoorManSmoothing(SmoothingAlgo):
             next_observation = self.observations[:,k]
             log_transition_density = log_gaussian_density_function(X=particle,
                                                                mean=params[0] * ancestor,
-                                                               covariance=torch.exp(params[1]))
-            log_t2 = manual_log_density_function(X=particle, mean=self.bootstrap_filter.params[0]*ancestor, covariance=torch.exp(self.bootstrap_filter.params[1])*torch.eye(1))
+                                                               covariance=torch.exp(torch.tensor(params[1])))
+            #log_t2 = manual_log_density_function(X=particle, mean=self.bootstrap_filter.params[0]*ancestor, covariance=torch.exp(self.bootstrap_filter.params[1])*torch.eye(1))
             covariance = torch.exp(particle).unsqueeze(-1)  # shape (B,J,1,1)
             log_observation_density = log_gaussian_density_function(X=next_observation.unsqueeze(-1),
                                                                 mean=torch.zeros(size=next_observation.unsqueeze(-1).size()),
-                                                                covariance=torch.exp(params[
-                                                                               2]) * covariance)
-            log_o2 = manual_log_density_function(X=next_observation, mean=torch.zeros(size=next_observation.size()), covariance=torch.exp(self.bootstrap_filter.params[2])*covariance)
+                                                                covariance=torch.exp(torch.tensor(params[
+                                                                               2])) * covariance)
+            #log_o2 = manual_log_density_function(X=next_observation, mean=torch.zeros(size=next_observation.size()), covariance=torch.exp(self.bootstrap_filter.params[2])*covariance)
             log_densities.append(log_transition_density + log_observation_density)
 
         log_density = torch.stack(log_densities, dim=0).sum(0) # shape (P) or shape (P,1)
