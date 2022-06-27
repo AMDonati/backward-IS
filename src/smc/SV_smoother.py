@@ -94,13 +94,13 @@ class SVBackwardISSmoothing(SmoothingAlgo):
         next_observation = next_observation.view(-1, 1, 1).repeat((1, self.backward_samples, 1))  # shape (P,J,1)
         log_transition_density = log_gaussian_density_function(X=particle,
                                                                mean=params[0] * ancestors,
-                                                               covariance=params[1] ** 2)
+                                                               covariance=torch.exp(params[1]))
         # log_t2 = manual_log_density_function(X=particle, mean=self.bootstrap_filter.params[0]*ancestors, covariance=self.bootstrap_filter.params[1]**2*torch.eye(1))
         covariance = torch.exp(particle).unsqueeze(-1)  # shape (B,J,1,1)
         log_observation_density = log_gaussian_density_function(X=next_observation,
                                                                 mean=torch.zeros(size=next_observation.size()),
-                                                                covariance=params[
-                                                                               2] ** 2 * covariance)
+                                                                covariance=torch.exp(params[
+                                                                               2]) * covariance)
         # log_o2 = manual_log_density_function(X=next_observation, mean=torch.zeros(size=next_observation.size()), covariance=self.bootstrap_filter.params[2]**2*covariance)
         return (log_transition_density + log_observation_density).unsqueeze(-1)
 
@@ -174,13 +174,6 @@ class SVBackwardISSmoothing(SmoothingAlgo):
                                                                       next_observation=self.observations[:, k],
                                                                       backward_samples=self.backward_samples,
                                                                       params=self.bootstrap_filter.params)  # shape (P,J)
-
-                # compute $\tau_{k+1}$ with all backward IS weights \bar{\omega}_k,  resampled ancestors \xi_k^{J_{k+1}}, current particle  \xi_{k+1} & all backward_indices J_{k+1}.
-                # new_tau = self.update_tau(ancestors=ancestors, particle=self.particles,
-                #                           backward_indices=backward_indices,
-                #                           IS_weights=is_weights.unsqueeze(-1),
-                #                           next_observation=self.observations[:, k], params=params, k=k, past_tau=self.past_tau)
-
                 # save elements in list for computing tau later on
                 self.list_resampled_ancestors.append(ancestors)
                 self.list_particles.append(self.particles)
@@ -260,14 +253,14 @@ class PoorManSmoothing(SmoothingAlgo):
             next_observation = self.observations[:,k]
             log_transition_density = log_gaussian_density_function(X=particle,
                                                                mean=params[0] * ancestor,
-                                                               covariance=params[1] ** 2)
-            log_t2 = manual_log_density_function(X=particle, mean=self.bootstrap_filter.params[0]*ancestor, covariance=self.bootstrap_filter.params[1]**2*torch.eye(1))
+                                                               covariance=torch.exp(params[1]))
+            log_t2 = manual_log_density_function(X=particle, mean=self.bootstrap_filter.params[0]*ancestor, covariance=torch.exp(self.bootstrap_filter.params[1])*torch.eye(1))
             covariance = torch.exp(particle).unsqueeze(-1)  # shape (B,J,1,1)
             log_observation_density = log_gaussian_density_function(X=next_observation.unsqueeze(-1),
                                                                 mean=torch.zeros(size=next_observation.unsqueeze(-1).size()),
-                                                                covariance=params[
-                                                                               2] ** 2 * covariance)
-            log_o2 = manual_log_density_function(X=next_observation, mean=torch.zeros(size=next_observation.size()), covariance=self.bootstrap_filter.params[2]**2*covariance)
+                                                                covariance=torch.exp(params[
+                                                                               2]) * covariance)
+            log_o2 = manual_log_density_function(X=next_observation, mean=torch.zeros(size=next_observation.size()), covariance=torch.exp(self.bootstrap_filter.params[2])*covariance)
             log_densities.append(log_transition_density + log_observation_density)
 
         log_density = torch.stack(log_densities, dim=0).sum(0) # shape (P) or shape (P,1)

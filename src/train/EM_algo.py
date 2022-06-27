@@ -94,14 +94,16 @@ if __name__ == '__main__':
 
     alpha = 0.98
     sigma = 0.1
+    rho = np.log(sigma**2)
     beta = 0.05
+    mu = np.log(beta**2)
 
     if args.init_params == "random1":
-        init_params = [0.5, 0.2, 1.2]
+        init_params = [0.5, np.log(0.2**2), np.log(1.2**2)]
     if args.init_params == "random2":
-        init_params = [0.75, 1.2, 0.3]
+        init_params = [0.75, np.log(1.2**2), np.log(0.3**2)]
     elif args.init_params == "true":
-        init_params = [alpha-0.05, sigma+0.05, beta+0.02]
+        init_params = [alpha-0.05, np.log((sigma+0.05)**2), np.log((beta+0.02)**2)]
 
     n_iter = args.n_iter
     n_bis = 1
@@ -296,7 +298,7 @@ if __name__ == '__main__':
 
         print("EXPECTATIONS:", expectations_results)
         plot_EM_results(expectations_results, out_folder, out_file="expectation_results_{}".format(optim_method))
-        plot_evol_params(list_params=list_params, true_params=[alpha, sigma, beta],
+        plot_evol_params(list_params=list_params, true_params=[alpha, rho, mu],
                          out_file=os.path.join(out_folder, "plot_evol_params.png"))
 
         params_star = dict(zip(["alpha", "sigma", "beta"], [str(i) for i in results.x]))
