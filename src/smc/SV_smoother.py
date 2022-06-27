@@ -94,13 +94,13 @@ class SVBackwardISSmoothing(SmoothingAlgo):
         next_observation = next_observation.view(-1, 1, 1).repeat((1, self.backward_samples, 1))  # shape (P,J,1)
         log_transition_density = log_gaussian_density_function(X=particle,
                                                                mean=params[0] * ancestors,
-                                                               covariance=torch.exp(params[1]))
+                                                               covariance=torch.exp(torch.tensor(params[1])))
         # log_t2 = manual_log_density_function(X=particle, mean=self.bootstrap_filter.params[0]*ancestors, covariance=self.bootstrap_filter.params[1]**2*torch.eye(1))
         covariance = torch.exp(particle).unsqueeze(-1)  # shape (B,J,1,1)
         log_observation_density = log_gaussian_density_function(X=next_observation,
                                                                 mean=torch.zeros(size=next_observation.size()),
-                                                                covariance=torch.exp(params[
-                                                                               2]) * covariance)
+                                                                covariance=torch.exp(torch.tensor(params[
+                                                                               2])) * covariance)
         # log_o2 = manual_log_density_function(X=next_observation, mean=torch.zeros(size=next_observation.size()), covariance=self.bootstrap_filter.params[2]**2*covariance)
         return (log_transition_density + log_observation_density).unsqueeze(-1)
 

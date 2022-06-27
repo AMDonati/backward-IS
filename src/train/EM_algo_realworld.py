@@ -48,8 +48,10 @@ def plot_evol_params(list_params, true_params, out_file):
 
 def generate_observations_from_learned_params(results, seq_len):
     alpha = results.x[0]
-    sigma = results.x[1]
-    beta = results.x[2]
+    rho = results.x[1]
+    sigma = np.exp(rho / 2)
+    mu = results.x[2]
+    beta = np.exp(mu/2)
 
     np.random.seed(123)# seed does not work...
     scale0 = alpha / np.sqrt(1 - alpha ** 2)
@@ -107,7 +109,7 @@ if __name__ == '__main__':
     sigma = args.sigma
     beta = args.beta
 
-    init_params = [alpha, sigma, beta]
+    init_params = [alpha, np.log(sigma**2), np.log(beta**2)]
 
     # create out_folder for saving plots:
     out_folder = args.out_path
@@ -195,7 +197,7 @@ if __name__ == '__main__':
 
     print("EXPECTATIONS:", expectations_results)
     plot_EM_results(expectations_results, out_folder, out_file="expectation_results_{}".format(optim_method))
-    plot_evol_params(list_params=list_params, true_params=[alpha, sigma, beta],
+    plot_evol_params(list_params=list_params, true_params=[alpha, np.log(sigma**2), np.log(beta**2)],
                      out_file=os.path.join(out_folder, "plot_evol_params.png"))
 
     params_star = dict(zip(["alpha", "sigma", "beta"], [str(i) for i in results.x]))

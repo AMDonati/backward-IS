@@ -105,6 +105,8 @@ if __name__ == '__main__':
     elif args.init_params == "true":
         init_params = [alpha-0.05, np.log((sigma+0.05)**2), np.log((beta+0.02)**2)]
 
+    #init_params = [torch.tensor(i) for i in init_params]
+
     n_iter = args.n_iter
     n_bis = 1
 
