@@ -160,6 +160,8 @@ if __name__ == '__main__':
 
     # EM algo.
     expectations_results, list_params = [], [init_params]
+
+    start_time_ = time.time()
     for iter in range(n_iter):
         # eval Q(\theta_k, \theta_k)
 
@@ -204,6 +206,9 @@ if __name__ == '__main__':
     with open(os.path.join(out_folder, "params_star.json"), 'w') as f:
         json.dump(params_star, f)
     np.save(os.path.join(out_folder, "list_params.npy"), np.array(list_params))
+
+    print("------------TIME FOR THE EM algo-----------")
+    print(time.time()-start_time_)
 
     print("done with EM algo")
 
