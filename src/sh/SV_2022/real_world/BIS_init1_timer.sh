@@ -73,3 +73,5 @@ echo "number of particles = 10000"
 set -x
 srun python -u src/train/EM_algo_realworld.py -data_path $DATA_PATH -out_path $OUT_PATH -num_particles $NUM_PARTICLES -backward_samples $BACKWARD_SAMPLES -algo $ALGO -n_iter $N_ITER -alpha $ALPHA -sigma $SIGMA -beta $BETA
 
+# PMS with 5000 particles equivalent in time to BIS with 100 particles.
+
