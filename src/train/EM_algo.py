@@ -92,10 +92,10 @@ if __name__ == '__main__':
     num_particles = args.num_particles
     backward_samples = args.backward_samples
 
-    alpha = 0.98
-    sigma = 0.1
+    alpha = 0.91
+    sigma = 1.0
     rho = np.log(sigma**2)
-    beta = 0.05
+    beta = 0.5
     mu = np.log(beta**2)
 
     if args.init_params == "random1":
@@ -104,8 +104,6 @@ if __name__ == '__main__':
         init_params = [0.75, np.log(1.2**2), np.log(0.3**2)]
     elif args.init_params == "true":
         init_params = [alpha-0.05, np.log((sigma+0.05)**2), np.log((beta+0.02)**2)]
-
-    #init_params = [torch.tensor(i) for i in init_params]
 
     n_iter = args.n_iter
     n_bis = 1
@@ -156,7 +154,6 @@ if __name__ == '__main__':
         print("uploading observations and states")
         observations = np.load(os.path.join(args.data_path, "observations.npy"))
         states = np.load(os.path.join(args.data_path, "states.npy"))
-
 
 
     print("OBSERVATIONS", observations)
