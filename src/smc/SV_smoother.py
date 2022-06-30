@@ -1,6 +1,6 @@
 import torch
 from smc.BootstrapFilter import RNNBootstrapFilter
-from smc.utils import resample, resample_all_seq_1D, log_gaussian_density_function, manual_log_density_function
+from smc.utils import resample, resample_all_seq_1D, resample_all_seq,  log_gaussian_density_function, manual_log_density_function
 import torch.nn as nn
 import os
 import numpy as np
@@ -53,8 +53,11 @@ class SmoothingAlgo:
         self.filtering_weights = self.bootstrap_filter.compute_filtering_weights(particle=self.ancestors,
                                                                                  observation=self.observations[:,
                                                                                              0],
-                                                                                 params=params)  # decide if take $Y_0 of $Y_1$
-        self.past_tau = torch.zeros(self.num_particles, 1)
+                                                                                 params=params) # decide if take $Y_0 of $Y_1$
+        if self.index_state is not None:
+            self.past_tau = torch.zeros(self.num_particles, self.seq_len, 1)
+        else:
+            self.past_tau = torch.zeros(self.num_particles, 1)
         self.new_tau = self.past_tau
         self.taus = []
         self.all_IS_weights = []
@@ -81,10 +84,8 @@ class SVBackwardISSmoothing(SmoothingAlgo):
             self.estimation_function = self.log_density_estimation_function
 
     def state_estimation_function(self, ancestors, k, particle=None, next_observation=None, params=None):
-        if k == self.index_state:
-            out = ancestors
-        else:
-            out = ancestors.new_zeros(ancestors.size())
+        out = ancestors.new_zeros(ancestors.unsqueeze(-2).repeat(1, 1, self.seq_len, 1).size())
+        out[:,:,k] = ancestors
         return out
 
     def log_density_estimation_function(self, ancestors, particle, next_observation, params, k=None):
@@ -114,15 +115,21 @@ class SVBackwardISSmoothing(SmoothingAlgo):
         # '''
         # '''update $\tau_k^l from $\tau_{k-1}^l, $w_{k-1]^l, $\xi_{k-1}^Jk$ and from Jk(j), \Tilde(w)(l,j) for all j in 0...backward samples'''
 
-        resampled_tau = resample(past_tau.repeat(backward_indices.size(0), 1, 1),
+        if self.index_state is None:
+            resampled_tau = resample(past_tau.repeat(backward_indices.size(0), 1, 1),
                                  backward_indices)  # (particles,backward_samples, 1) # OK, function resampled checked.
+        else:
+            resampled_tau = resample_all_seq(past_tau.repeat(backward_indices.size(0), 1, 1, 1),
+                                     backward_indices)
 
         new_estimate = self.estimation_function(ancestors=ancestors, particle=particle,
                                                 next_observation=next_observation, params=params, k=k)  # shape (P,J,1)
-
+        if self.index_state is not None:
+            IS_weights = IS_weights.unsqueeze(-2).repeat(1,1,self.seq_len, 1)
         new_tau_element = IS_weights * (
-                resampled_tau + new_estimate)  # shape (P,J,1)  # (particles, backward_samples, 1)
+                resampled_tau + new_estimate)  # shape (P,J,1)  # (particles, backward_samples, 1) or (P,J,S,1)
         new_tau = new_tau_element.sum(1)
+        print("NEW TAU", new_tau[0].squeeze())
         return new_tau  # shape (P,1)
 
     def compute_expectation_from_saved_elements(self, params):
@@ -138,7 +145,7 @@ class SVBackwardISSmoothing(SmoothingAlgo):
                                       params=params)
             past_tau = new_tau
 
-        return -((new_tau.squeeze() * self.filtering_weights).sum().numpy())
+        return -((new_tau.squeeze() * self.filtering_weights).sum(0).numpy())
 
 
     def save_smoothing_elements(self):
@@ -222,7 +229,10 @@ class SVBackwardISSmoothing(SmoothingAlgo):
                 self.ancestors = self.particles
                 self.taus.append(self.new_tau)
 
-        return -((self.new_tau.squeeze() * self.filtering_weights).sum().numpy())
+        if self.index_state is not None:
+            self.filtering_weights = self.filtering_weights.unsqueeze(-1).repeat(1,self.seq_len)
+
+        return -((self.new_tau.squeeze() * self.filtering_weights).sum(0).numpy())
 
 class PoorManSmoothing(SmoothingAlgo):
     def __init__(self, bootstrap_filter, observations, out_folder=None,

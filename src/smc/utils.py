@@ -24,8 +24,8 @@ def resample_1D(params, I):
 
 def resample_all_seq(params, i_t):
     '''
-    :param params > shape (B,S,D)
-    :param i_t: current indice > shape (B,1)
+    :param params > shape (P,J,S,1)
+    :param i_t: current indice > shape (P,J)
     '''
     I = i_t.view(i_t.size(0), i_t.size(1), 1, 1).repeat(1, 1, params.size(-2), params.size(-1))
     resampled_params = torch.gather(input=params, index=I, dim=1)

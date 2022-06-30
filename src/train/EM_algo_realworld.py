@@ -87,7 +87,7 @@ def get_parser():
                         help="PMS or BIS")
     parser.add_argument("-n_iter", type=int, default=50,
                         help="number of iterations for the EM algo.")
-    parser.add_argument("-n_trials", type=int, default=5,
+    parser.add_argument("-n_trials", type=int, default=50,
                         help="number of trials for state estimation.")
     parser.add_argument("-alpha", type=float, default=0.91,
                         help="init alpha for the EM algo.")
@@ -127,6 +127,7 @@ if __name__ == '__main__':
     # other params: 0.91, 1.0, 0.5
 
     observations_raw = np.load(os.path.join(args.data_path, "GE_observations.npy"))
+    #observations_raw = observations_raw[:20]
 
     print("OBSERVATIONS", observations_raw)
 
@@ -238,32 +239,29 @@ if __name__ == '__main__':
         beta = float(converged_params["beta"])
         bt_filter = SVBootstrapFilter(num_particles, [alpha, sigma, beta])
 
-        index_states = [1, 24, 49, 99]
         num_trials = args.n_trials
-        states_estims = np.zeros((len(index_states), num_trials))
-        results = dict.fromkeys(index_states)
-        for iter, index_state in enumerate(index_states):
-            # create SVBackward IS smoothing with number of backward samples, out_folder, logger.
-            if algo == 'BIS':
-                smoother = SVBackwardISSmoothing(backward_samples=backward_samples, observations=observations,
-                                                 bootstrap_filter=bt_filter, index_state=index_state)
-            elif algo == 'PMS':
-                smoother = PoorManSmoothing(observations=observations,
-                                            bootstrap_filter=bt_filter, index_state=index_state)
+        states_estims = np.zeros((len(observations_raw), num_trials))
+        # create SVBackward IS smoothing with number of backward samples, out_folder, logger.
+        if algo == 'BIS':
+            smoother = SVBackwardISSmoothing(backward_samples=backward_samples, observations=observations,
+                                             bootstrap_filter=bt_filter, index_state=1)
+        elif algo == 'PMS':
+            smoother = PoorManSmoothing(observations=observations,
+                                        bootstrap_filter=bt_filter, index_state=1)
 
-            print("params of SV model:", smoother.bootstrap_filter.params)
+        print("params of SV model:", smoother.bootstrap_filter.params)
 
-            for trials in range(num_trials):
-                start_time = time.time()
-                if algo == "BIS":
-                    state_estim = -smoother.estimate_conditional_expectation_of_function(params=[alpha, sigma, beta])
-                elif algo == "PMS":
-                    smoother.save_smoothing_elements()
-                    state_estim = -smoother.compute_expectation_from_saved_elements([alpha, sigma, beta])
-                print("time for one estimation", time.time() - start_time)
-                states_estims[iter, trials] = state_estim
+        for trials in range(num_trials):
+            start_time = time.time()
+            if algo == "BIS":
+                state_estim = -smoother.estimate_conditional_expectation_of_function(params=[alpha, sigma, beta])
+            elif algo == "PMS":
+                smoother.save_smoothing_elements()
+                state_estim = -smoother.compute_expectation_from_saved_elements([alpha, sigma, beta])
+            print("time for one estimation", time.time() - start_time)
+            states_estims[:, trials] = state_estim
 
-        np.save(os.path.join(out_folder, "state_estims.npy"), state_estim)
+        np.save(os.path.join(out_folder, "states_estims.npy"), states_estims)
 
 
 
