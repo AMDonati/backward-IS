@@ -78,6 +78,7 @@ def get_parser():
     parser.add_argument("-data_path", type=str,
                         help="path for uploading the observations and states")
     parser.add_argument("-out_path", type=str, default="experiments_realworld")
+    parser.add_argument("-results_path", type=str, default=None)
     parser.add_argument("-num_particles", type=int, default=100,
                         help="number of particles for the Bootstrap Filter")
     parser.add_argument("-backward_samples", type=int, default=16,
@@ -86,6 +87,8 @@ def get_parser():
                         help="PMS or BIS")
     parser.add_argument("-n_iter", type=int, default=50,
                         help="number of iterations for the EM algo.")
+    parser.add_argument("-n_trials", type=int, default=5,
+                        help="number of trials for state estimation.")
     parser.add_argument("-alpha", type=float, default=0.91,
                         help="init alpha for the EM algo.")
     parser.add_argument("-sigma", type=float, default=1.0,
@@ -111,10 +114,13 @@ if __name__ == '__main__':
 
     init_params = [alpha, np.log(sigma**2), np.log(beta**2)]
 
-    # create out_folder for saving plots:
-    out_folder = args.out_path
-    if not os.path.isdir(out_folder):
-        os.makedirs(out_folder)
+    if args.results_path is None:
+        # create out_folder for saving plots:
+        out_folder = args.out_path
+        if not os.path.isdir(out_folder):
+            os.makedirs(out_folder)
+    else:
+        out_folder = args.results_path
 
     # ----------------------------------------- create synthetic SV dataset --------------------------------------
     # values paper Jimmy: 0.8,O.1,1.
@@ -129,96 +135,135 @@ if __name__ == '__main__':
     # observations = torch tensor of size T.
     observations = torch.tensor(observations, dtype=torch.float32)
 
+
     # ---------------------------------------------------------------------------------------------------------------------------- #
 
-    # Create bootstrap filter with init params and number of particles
-    bt_filter = SVBootstrapFilter(num_particles, init_params)
+    if args.results_path is None:
+        # Create bootstrap filter with init params and number of particles
+        bt_filter = SVBootstrapFilter(num_particles, init_params)
 
-    ######################### ---- Parameter Estimation with EM algo --------------- ###################################
-    optim_method = 'Powell'  # optimizers tried: 'BFGS', 'Nelder-Mead', 'Powell', 'L-BFGS-B'
-    # BFGS, L-BFGS -> params do not move.
-    out_folder = os.path.join(out_folder,
-                              "{}_EM_{}_{}P_{}J-initparams-{}-{}-{}".format(algo, optim_method, num_particles,
-                                                                                backward_samples,
-                                                                                init_params[0],
-                                                                                init_params[1], init_params[2]))
-    if not os.path.isdir(out_folder):
-        os.makedirs(out_folder)
+        ######################### ---- Parameter Estimation with EM algo --------------- ###################################
+        optim_method = 'Powell'  # optimizers tried: 'BFGS', 'Nelder-Mead', 'Powell', 'L-BFGS-B'
+        # BFGS, L-BFGS -> params do not move.
+        out_folder = os.path.join(out_folder,
+                                  "{}_EM_{}_{}P_{}J-initparams-{}-{}-{}".format(algo, optim_method, num_particles,
+                                                                                    backward_samples,
+                                                                                    init_params[0],
+                                                                                    init_params[1], init_params[2]))
+        if not os.path.isdir(out_folder):
+            os.makedirs(out_folder)
 
-    maxiter = 300
-    options = {'maxiter': maxiter, 'maxfev': None, 'disp': True, 'return_all': True}
+        maxiter = 300
+        options = {'maxiter': maxiter, 'maxfev': None, 'disp': True, 'return_all': True}
 
-    print("INIT PARAMS: {}".format(init_params))
+        print("INIT PARAMS: {}".format(init_params))
 
-    if algo == "BIS":
-        smoother = SVBackwardISSmoothing(backward_samples=backward_samples, observations=observations,
-                                         bootstrap_filter=bt_filter)
-    elif algo == "PMS":
-        smoother = PoorManSmoothing(bootstrap_filter=bt_filter, observations=observations)
+        if algo == "BIS":
+            smoother = SVBackwardISSmoothing(backward_samples=backward_samples, observations=observations,
+                                             bootstrap_filter=bt_filter)
+        elif algo == "PMS":
+            smoother = PoorManSmoothing(bootstrap_filter=bt_filter, observations=observations)
 
-    bt_filter.update_SV_params(init_params)
+        bt_filter.update_SV_params(init_params)
 
-    # EM algo.
-    expectations_results, list_params = [], [init_params]
+        # EM algo.
+        expectations_results, list_params = [], [init_params]
 
-    start_time_ = time.time()
-    for iter in range(n_iter):
-        # eval Q(\theta_k, \theta_k)
+        start_time_ = time.time()
+        for iter in range(n_iter):
+            # eval Q(\theta_k, \theta_k)
 
-        print("PARAMS in SMOOTHING:", smoother.bootstrap_filter.params)
-        # expectation = smoother.estimate_conditional_expectation_of_function(bt_filter.params)
+            print("PARAMS in SMOOTHING:", smoother.bootstrap_filter.params)
+            # expectation = smoother.estimate_conditional_expectation_of_function(bt_filter.params)
 
-        start_time = time.time()
-        smoother.save_smoothing_elements()
-        expectation = smoother.compute_expectation_from_saved_elements(params=bt_filter.params)
-        expectations_results.append(expectation)
-        print("eval Q(theta_k, theta_k) at iter {}: {}".format(iter, expectation))
+            start_time = time.time()
+            smoother.save_smoothing_elements()
+            expectation = smoother.compute_expectation_from_saved_elements(params=bt_filter.params)
+            expectations_results.append(expectation)
+            print("eval Q(theta_k, theta_k) at iter {}: {}".format(iter, expectation))
 
-        results = opt.minimize(fun=smoother.compute_expectation_from_saved_elements, x0=bt_filter.params,
-                               method=optim_method, options=options)
+            results = opt.minimize(fun=smoother.compute_expectation_from_saved_elements, x0=bt_filter.params,
+                                   method=optim_method, options=options)
 
-        print("time for one EM", time.time() - start_time)
+            print("time for one EM", time.time() - start_time)
 
-        if "allvecs" in results.keys():
-            fn_evals = [smoother.compute_expectation_from_saved_elements(vecs) for vecs in results["allvecs"]]
-            out_file = "EM_{}_maxiter{}_{}-{}iters.png".format(optim_method, maxiter, iter, n_iter)
-            plot_EM_results(fn_evals, out_folder, out_file)
+            if "allvecs" in results.keys():
+                fn_evals = [smoother.compute_expectation_from_saved_elements(vecs) for vecs in results["allvecs"]]
+                out_file = "EM_{}_maxiter{}_{}-{}iters.png".format(optim_method, maxiter, iter, n_iter)
+                plot_EM_results(fn_evals, out_folder, out_file)
 
-        print("OPTIM SUCCESS:", results.success)
+            print("OPTIM SUCCESS:", results.success)
 
-        print("new params: {}".format(results.x))
-        list_params.append(results.x)
+            print("new params: {}".format(results.x))
+            list_params.append(results.x)
 
-        # eval Q(theta_{k+1), \theta_k)
-        new_expectation = smoother.compute_expectation_from_saved_elements(results.x)
-        print("eval Q(theta_k+1, theta_k) at iter {}: {}".format(iter, new_expectation))
+            # eval Q(theta_{k+1), \theta_k)
+            new_expectation = smoother.compute_expectation_from_saved_elements(results.x)
+            print("eval Q(theta_k+1, theta_k) at iter {}: {}".format(iter, new_expectation))
 
-        bt_filter.update_SV_params(results.x)
+            bt_filter.update_SV_params(results.x)
 
-        print("-" * 30)
+            print("-" * 30)
 
-    print("EXPECTATIONS:", expectations_results)
-    plot_EM_results(expectations_results, out_folder, out_file="expectation_results_{}".format(optim_method))
-    plot_evol_params(list_params=list_params, true_params=[alpha, np.log(sigma**2), np.log(beta**2)],
-                     out_file=os.path.join(out_folder, "plot_evol_params.png"))
+        print("EXPECTATIONS:", expectations_results)
+        plot_EM_results(expectations_results, out_folder, out_file="expectation_results_{}".format(optim_method))
+        plot_evol_params(list_params=list_params, true_params=[alpha, np.log(sigma**2), np.log(beta**2)],
+                         out_file=os.path.join(out_folder, "plot_evol_params.png"))
 
-    params_star = dict(zip(["alpha", "sigma", "beta"], [str(i) for i in results.x]))
-    with open(os.path.join(out_folder, "params_star.json"), 'w') as f:
-        json.dump(params_star, f)
-    np.save(os.path.join(out_folder, "list_params.npy"), np.array(list_params))
+        params_star = dict(zip(["alpha", "sigma", "beta"], [str(i) for i in results.x]))
+        with open(os.path.join(out_folder, "params_star.json"), 'w') as f:
+            json.dump(params_star, f)
+        np.save(os.path.join(out_folder, "list_params.npy"), np.array(list_params))
 
-    print("------------TIME FOR THE EM algo-----------")
-    print(time.time()-start_time_)
+        print("------------TIME FOR THE EM algo-----------")
+        print(time.time()-start_time_)
 
-    print("done with EM algo")
+        print("done with EM algo")
 
-    generated_observations = generate_observations_from_learned_params(results, seq_len=observations.shape[-1])
+        generated_observations = generate_observations_from_learned_params(results, seq_len=observations.shape[-1])
 
-    plot_observations(observations_raw, generated_observations, os.path.join(out_folder, 'plot_observations.png'))
+        plot_observations(observations_raw, generated_observations, os.path.join(out_folder, 'plot_observations.png'))
 
-    mse = 0.5 * np.square(observations_raw - generated_observations)
-    np.save(os.path.join(out_folder, "mses.npy"), mse)
-    np.save(os.path.join(out_folder, "generated_observations.npy"), generated_observations)
+        mse = 0.5 * np.square(observations_raw - generated_observations)
+        np.save(os.path.join(out_folder, "mses.npy"), mse)
+        np.save(os.path.join(out_folder, "generated_observations.npy"), generated_observations)
+
+    else:
+        # upload converged params:
+        params_path = os.path.join(out_folder, "params_star.json")
+        with open(params_path, 'r') as f:
+            converged_params = json.load(f)
+        alpha = float(converged_params["alpha"])
+        sigma = float(converged_params["sigma"])
+        beta = float(converged_params["beta"])
+        bt_filter = SVBootstrapFilter(num_particles, [alpha, sigma, beta])
+
+        index_states = [1, 24, 49, 99]
+        num_trials = args.n_trials
+        states_estims = np.zeros((len(index_states), num_trials))
+        results = dict.fromkeys(index_states)
+        for iter, index_state in enumerate(index_states):
+            # create SVBackward IS smoothing with number of backward samples, out_folder, logger.
+            if algo == 'BIS':
+                smoother = SVBackwardISSmoothing(backward_samples=backward_samples, observations=observations,
+                                                 bootstrap_filter=bt_filter, index_state=index_state)
+            elif algo == 'PMS':
+                smoother = PoorManSmoothing(observations=observations,
+                                            bootstrap_filter=bt_filter, index_state=index_state)
+
+            print("params of SV model:", smoother.bootstrap_filter.params)
+
+            for trials in range(num_trials):
+                start_time = time.time()
+                if algo == "BIS":
+                    state_estim = -smoother.estimate_conditional_expectation_of_function(params=[alpha, sigma, beta])
+                elif algo == "PMS":
+                    smoother.save_smoothing_elements()
+                    state_estim = -smoother.compute_expectation_from_saved_elements([alpha, sigma, beta])
+                print("time for one estimation", time.time() - start_time)
+                states_estims[iter, trials] = state_estim
+
+        np.save(os.path.join(out_folder, "state_estims.npy"), state_estim)
 
 
 
